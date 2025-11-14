@@ -1,7 +1,6 @@
-# splitify
+# Splitify
 
-A new Flutter project.
-
+Is a split bill application that integrate with firebase
 ## Getting Started
 
 This project is a starting point for a Flutter application.
