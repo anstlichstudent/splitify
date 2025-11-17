@@ -9,8 +9,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'firebase_options.dart';
 
 // Halaman-halaman fitur
-import 'features/auth/presentation/pages/signup_page.dart';
-import 'features/auth/presentation/pages/login_page.dart';
+import 'auth/signup_page.dart';
+import 'auth/login_page.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();

@@ -6,6 +6,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import './login_page.dart';
 // Asumsi halaman home adalah Placeholder()
 // import '../../../../home/presentation/pages/home_page.dart';
+import '../page/home_screen.dart';
 
 class SignUpScreen extends StatefulWidget {
   // Ubah nama kelas menjadi SignUpScreen agar konsisten
@@ -60,7 +61,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(
-          builder: (context) => const Placeholder(),
+          builder: (context) => const HomeScreen(),
         ), // Ganti dengan HomePage() Anda
       );
     } on FirebaseAuthException catch (e) {
@@ -95,7 +96,6 @@ class _SignUpScreenState extends State<SignUpScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // Warna dasar yang konsisten
     const Color darkBlue = Color(0xFF000518);
     const Color primaryColor = Color(0xFF3B5BFF);
 
@@ -103,7 +103,6 @@ class _SignUpScreenState extends State<SignUpScreen> {
       backgroundColor: darkBlue,
       body: Stack(
         children: <Widget>[
-          // --- 1. Latar Belakang Abstrak Kiri Atas ---
           Positioned(
             top: -50,
             left: -50,
@@ -183,8 +182,6 @@ class _SignUpScreenState extends State<SignUpScreen> {
                     keyboardType: TextInputType.emailAddress,
                   ),
                   const SizedBox(height: 20),
-
-                  // --- Input Password ---
                   _buildInputField(
                     controller: _passwordController,
                     validator: (value) {
@@ -210,14 +207,11 @@ class _SignUpScreenState extends State<SignUpScreen> {
                     ),
                   ),
                   const SizedBox(height: 20),
-
-                  // --- Input Confirm Password ---
                   _buildInputField(
                     controller: _confirmPasswordController,
                     validator: (value) {
                       if (value == null || value.isEmpty)
                         return 'Konfirmasi Password wajib diisi';
-                      // Validasi kecocokan password akan dilakukan di fungsi _signUp
                       return null;
                     },
                     hint: 'Confirm Password',
@@ -292,12 +286,12 @@ class _SignUpScreenState extends State<SignUpScreen> {
                       ),
                       TextButton(
                         onPressed: () {
-                          // Kembali ke LoginScreen
-                          Navigator.pop(
+                          Navigator.push(
                             context,
-                          ); // Gunakan pop jika dipush dari LoginScreen
-                          // ATAU
-                          // Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const LoginScreen()));
+                            MaterialPageRoute(
+                              builder: (context) => LoginScreen(),
+                            ),
+                          );
                         },
                         child: const Text(
                           'Login',

@@ -1,7 +1,7 @@
 // File: lib/features/auth/presentation/pages/login_page.dart
 
 import 'package:flutter/material.dart';
-import './signup_page.dart';
+import 'signup_page.dart';
 
 class LoginScreen extends StatefulWidget {
   @override
