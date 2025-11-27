@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart'; // Untuk mendapatkan nama user
-// import './create_activity_screen.dart'; // Untuk navigasi ke pembuatan grup
+import './create_activity_screen.dart'; // Untuk navigasi ke pembuatan grup
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -40,11 +40,10 @@ class _HomeScreenState extends State<HomeScreen> {
       'Pengguna';
 
   void _navigateAndCreateActivity(BuildContext context) async {
-    // Navigasi ke layar pembuatan kegiatan
-    // await Navigator.push(
-    //   context,
-    //   MaterialPageRoute(builder: (context) => const CreateActivityScreen()),
-    // );
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const CreateActivityScreen()),
+    );
     // TODO: Di sini seharusnya ada logic untuk me-refresh data dari Firestore
   }
 
@@ -163,10 +162,8 @@ class _HomeScreenState extends State<HomeScreen> {
                         color: Colors.white,
                         size: 28,
                       ),
-                      onPressed: () {
-                        // Navigasi ke tab Notifikasi, atau set index 1 di DashboardScreen
-                        // Karena ini ada di dalam DashboardScreen, kita bisa navigasi atau set state Dashboard
-                        // Untuk saat ini, hanya Notifikasi
+                      onPressed: (Navigator.push(context, )) {
+                    
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(
                             content: Text('Membuka Notifikasi...'),

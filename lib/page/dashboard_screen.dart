@@ -12,13 +12,12 @@ class DashboardScreen extends StatefulWidget {
 }
 
 class _DashboardScreenState extends State<DashboardScreen> {
-  // 0 = Home, 1 = Notif, 2 = Profil
   int _selectedIndex = 0;
-
   // Halaman sesuai tab
   static const List<Widget> _pages = <Widget>[
     HomeScreen(),
     HistoryScreen(),
+    ScanStrukPage(),
     NotificationsScreen(),
     ProfileScreen(),
   ];
@@ -28,15 +27,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
       _selectedIndex = index;
     });
   }
-
-  // FAB → halaman scan struk
-  void _navigateToScanPage() {
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (context) => const ScanStrukPage()),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     const Color darkBlue = Color(0xFF0D172A);
@@ -44,29 +34,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
     return Scaffold(
       backgroundColor: darkBlue,
-
       body: SafeArea(child: _pages[_selectedIndex]),
-
-      // FAB bulat di tengah, nembus BottomAppBar
-      floatingActionButton: Padding(
-        padding: const EdgeInsets.only(bottom: 1),
-        child: FloatingActionButton(
-          heroTag: 'scan-fab',
-          backgroundColor: primaryColor,
-          shape: const CircleBorder(),
-          onPressed: _navigateToScanPage,
-          child: const Icon(Icons.camera_alt, color: Colors.white, size: 28),
-        ),   
-      ),
-      floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
-
       // Bottom bar dengan notch untuk FAB
       bottomNavigationBar: SafeArea(
         top: true,
         child: BottomAppBar(
           color: darkBlue,
           shape: const CircularNotchedRectangle(),
-          // notchMargin: 6.0,
           child: SizedBox(
             height: 60, // tinggi fix, aman di semua hp
             child: Row(
@@ -89,20 +63,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         activeIcon: Icons.history,
                         label: 'History',
                       ),
-                    ],
-                  ),
-                ),
-
-                // ruang untuk FAB di tengah
-                const SizedBox(width: 50),
-
-                // Bagian kanan (Notif & Profil)
-                Expanded(
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
+                      const SizedBox(width: 50),
                       _buildNavItem(
                         index: 2,
+                        icon: Icons.camera_alt_rounded,
+                        activeIcon: Icons.camera_alt_rounded,
+                        label: 'Scan',
+                      ),
+                      const SizedBox(width: 50),
+                      _buildNavItem(
+                        index: 3,
                         icon: Icons.notifications_outlined,
                         activeIcon: Icons.notifications,
                         label: 'Notif',
@@ -110,7 +80,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       const SizedBox(width: 50),
 
                       _buildNavItem(
-                        index: 3,
+                        index: 4,
                         icon: Icons.person_outline,
                         activeIcon: Icons.person,
                         label: 'Profil',

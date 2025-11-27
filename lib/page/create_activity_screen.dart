@@ -96,9 +96,7 @@ class _CreateActivityScreenState extends State<CreateActivityScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Aktivitas dibuat. Lanjut ke Bill Review.')),
       );
-      
-      // Contoh: Navigator.push(context, MaterialPageRoute(builder: (context) => BillReviewScreen(activityData: newActivity)));
-    }
+          }
   }
 
   // Helper Widget untuk Input Field
