@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:splitify/page/scan_qr_screen.dart';
 import 'package:splitify/services/user_service.dart';
 // Import layar QR Code yang sudah direncanakan
 import 'show_qr_screen.dart';
@@ -210,7 +211,7 @@ class _AddFriendScreenState extends State<AddFriendScreen> {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (context) => const ScanQrScreen(),
+                      builder: (context) => ScanQrScreen(),
                     ),
                   );
                 },

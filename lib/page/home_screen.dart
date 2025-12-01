@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart'; // Untuk mendapatkan nama user
+import 'package:splitify/page/add-friends-screen.dart';
 import './create_activity_screen.dart'; // Untuk navigasi ke pembuatan grup
 
 class HomeScreen extends StatefulWidget {
@@ -162,11 +163,10 @@ class _HomeScreenState extends State<HomeScreen> {
                         color: Colors.white,
                         size: 28,
                       ),
-                      onPressed: (Navigator.push(context, )) {
-                    
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Membuka Notifikasi...'),
+                      onPressed: () {
+                        Navigator.push(context, 
+                          MaterialPageRoute(
+                            builder: (context) => const AddFriendScreen(),
                           ),
                         );
                       },
@@ -217,7 +217,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   backgroundColor: primaryColor,
                   padding: const EdgeInsets.symmetric(
                     horizontal: 20,
-                    vertical:15,
+                    vertical: 15,
                   ),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(30),
