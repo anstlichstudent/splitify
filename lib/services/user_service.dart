@@ -65,4 +65,115 @@ class UserService {
     // Menggunakan safe cast (List<String>.from)
     return List<String>.from(data?['friends'] ?? []);
   }
+
+  // ✏️ Update user profile (Name)
+  Future<void> updateUserProfile({required String name}) async {
+    final currentUser = _auth.currentUser;
+
+    if (currentUser == null) {
+      throw FirebaseException(
+        plugin: 'UserService',
+        code: 'NOT_AUTHENTICATED',
+        message: 'User harus login untuk mengupdate profil.',
+      );
+    }
+
+    // 1. Update Display Name di FirebaseAuth
+    await currentUser.updateDisplayName(name);
+
+    // 2. Update Name di Firestore
+    await _firestore.collection('users').doc(currentUser.uid).update({
+      'name': name,
+    });
+  }
+
+  // 🔒 Ganti Password
+  Future<void> changePassword({
+    required String currentPassword,
+    required String newPassword,
+  }) async {
+    final currentUser = _auth.currentUser;
+
+    if (currentUser == null) {
+      throw FirebaseException(
+        plugin: 'UserService',
+        code: 'NOT_AUTHENTICATED',
+        message: 'User harus login untuk mengganti password.',
+      );
+    }
+
+    final email = currentUser.email;
+    if (email == null) {
+      throw FirebaseException(
+        plugin: 'UserService',
+        code: 'NO_EMAIL',
+        message: 'User tidak memiliki email.',
+      );
+    }
+
+    // Re-authenticate user
+    final credential = EmailAuthProvider.credential(
+      email: email,
+      password: currentPassword,
+    );
+
+    await currentUser.reauthenticateWithCredential(credential);
+
+    // Update password
+    await currentUser.updatePassword(newPassword);
+  }
+
+  // 🗑️ Hapus Akun
+  Future<void> deleteAccount({required String password}) async {
+    final currentUser = _auth.currentUser;
+
+    if (currentUser == null) {
+      throw FirebaseException(
+        plugin: 'UserService',
+        code: 'NOT_AUTHENTICATED',
+        message: 'User harus login untuk menghapus akun.',
+      );
+    }
+
+    final email = currentUser.email;
+    if (email == null) {
+      throw FirebaseException(
+        plugin: 'UserService',
+        code: 'NO_EMAIL',
+        message: 'User tidak memiliki email.',
+      );
+    }
+
+    // Re-authenticate user
+    final credential = EmailAuthProvider.credential(
+      email: email,
+      password: password,
+    );
+
+    await currentUser.reauthenticateWithCredential(credential);
+
+    // Hapus user dari Authentication
+    await currentUser.delete();
+  }
+
+  // 📧 Ganti Email
+  Future<void> updateEmail({required String newEmail}) async {
+    final currentUser = _auth.currentUser;
+
+    if (currentUser == null) {
+      throw FirebaseException(
+        plugin: 'UserService',
+        code: 'NOT_AUTHENTICATED',
+        message: 'User harus login untuk mengganti email.',
+      );
+    }
+
+    // Update email di Authentication (Mengirim verifikasi)
+    await currentUser.verifyBeforeUpdateEmail(newEmail);
+
+    // Update email di Firestore
+    await _firestore.collection('users').doc(currentUser.uid).update({
+      'email': newEmail,
+    });
+  }
 }
