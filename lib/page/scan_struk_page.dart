@@ -1,13 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'dart:io';
-// Firebase dan MLKit
+// Firebase dan OCR
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:camera/camera.dart';
 import 'package:permission_handler/permission_handler.dart';
-
+import 'package:splitify/services/gemini_ocr_service.dart';
+import 'package:splitify/config/app_config.dart' as config;
 
 class ScanStrukPage extends StatefulWidget {
   const ScanStrukPage({super.key});
@@ -19,29 +20,40 @@ class ScanStrukPage extends StatefulWidget {
 class _ScanStrukPageState extends State<ScanStrukPage> {
   CameraController? _cameraController;
   late final TextRecognizer _textRecognizer;
+  late final GeminiOCRService _geminiOCR;
 
   File? _capturedImage;
   String _recognizedText = "";
   bool _isProcessing = false;
   bool _isCameraInitialized = false;
   bool _showConfirmation = false;
+  Map<String, dynamic> _extractedData = {};
 
   @override
   void initState() {
     super.initState();
     _textRecognizer = TextRecognizer(script: TextRecognitionScript.latin);
+    // Initialize Gemini dengan API key (pastikan set di environment/firebase config)
+    _geminiOCR = GeminiOCRService(apiKey: _getApiKey());
     _initializeCamera();
+  }
+
+  String _getApiKey() {
+    // Get dari AppConfig yang bisa read dari environment/Firebase
+    return config.AppConfig.geminiApiKey.isEmpty
+        ? 'your_gemini_api_key_here' // Fallback temporary
+        : config.AppConfig.geminiApiKey;
   }
 
   // Inisialisasi kamera
   Future<void> _initializeCamera() async {
-      var status = await Permission.camera.request();
-  if (!status.isGranted) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Akses kamera ditolak')),
-    );
-    return;
-  }
+    var status = await Permission.camera.request();
+    if (!status.isGranted) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Akses kamera ditolak')));
+      return;
+    }
     try {
       final cameras = await availableCameras();
       if (cameras.isEmpty) {
@@ -96,9 +108,9 @@ class _ScanStrukPageState extends State<ScanStrukPage> {
       });
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error mengambil foto: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error mengambil foto: $e')));
       }
     }
   }
@@ -135,10 +147,53 @@ class _ScanStrukPageState extends State<ScanStrukPage> {
     });
   }
 
-  // Proses OCR
+  // Proses OCR dengan Gemini
   Future<void> _processImage() async {
     if (_capturedImage == null) return;
 
+    try {
+      setState(() {
+        _isProcessing = true;
+      });
+
+      // Try Gemini OCR first (better untuk receipt)
+      try {
+        final data = await _geminiOCR.extractReceiptData(_capturedImage!);
+
+        setState(() {
+          _extractedData = data;
+          _recognizedText = _formatReceiptData(data);
+          _isProcessing = false;
+        });
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Receipt berhasil di-scan dengan Gemini OCR'),
+              backgroundColor: Color(0xFF3B5BFF),
+            ),
+          );
+        }
+      } catch (geminiError) {
+        print('Gemini OCR failed: $geminiError. Fallback to MLKit...');
+
+        // Fallback ke MLKit
+        await _processImageWithMLKit();
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error memproses gambar: $e')));
+      }
+      setState(() {
+        _recognizedText = "Error: $e";
+        _isProcessing = false;
+      });
+    }
+  }
+
+  Future<void> _processImageWithMLKit() async {
     try {
       final inputImage = InputImage.fromFilePath(_capturedImage!.path);
       final RecognizedText recognizedText = await _textRecognizer.processImage(
@@ -151,31 +206,72 @@ class _ScanStrukPageState extends State<ScanStrukPage> {
 
       setState(() {
         _recognizedText = extractedText;
+        _isProcessing = false;
       });
     } on MissingPluginException {
       const msg = 'Plugin pengenalan teks tidak tersedia di platform ini.';
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text(msg)),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text(msg)));
       }
       setState(() {
         _recognizedText = msg;
+        _isProcessing = false;
       });
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error memproses gambar: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error MLKit: $e')));
       }
       setState(() {
-        _recognizedText = "Error: $e";
-      });
-    } finally {
-      setState(() {
+        _recognizedText = "MLKit Error: $e";
         _isProcessing = false;
       });
     }
+  }
+
+  String _formatReceiptData(Map<String, dynamic> data) {
+    final buffer = StringBuffer();
+
+    final items = data['items'] as List<dynamic>? ?? [];
+    if (items.isNotEmpty) {
+      buffer.writeln('📋 ITEM PESANAN:');
+      for (final item in items) {
+        final name = item['name'] ?? 'Unknown';
+        final price = item['price'] ?? 0;
+        final qty = item['quantity'] ?? 1;
+        buffer.writeln('  • $name x$qty = Rp $price');
+      }
+      buffer.writeln();
+    }
+
+    final restaurantName = data['restaurant_name'] ?? '';
+    if (restaurantName.isNotEmpty) {
+      buffer.writeln('🏪 Tempat: $restaurantName');
+    }
+
+    final date = data['date'] ?? '';
+    if (date.isNotEmpty) {
+      buffer.writeln('📅 Tanggal: $date');
+    }
+
+    buffer.writeln();
+    buffer.writeln('💰 RINGKASAN:');
+    buffer.writeln('  Subtotal: Rp ${data['subtotal'] ?? 0}');
+    if ((data['tax'] as num? ?? 0) > 0) {
+      buffer.writeln('  Pajak: Rp ${data['tax'] ?? 0}');
+    }
+    if ((data['service_charge'] as num? ?? 0) > 0) {
+      buffer.writeln('  Service: Rp ${data['service_charge'] ?? 0}');
+    }
+    if ((data['discount'] as num? ?? 0) > 0) {
+      buffer.writeln('  Diskon: -Rp ${data['discount'] ?? 0}');
+    }
+    buffer.writeln('  TOTAL: Rp ${data['total'] ?? 0}');
+
+    return buffer.toString();
   }
 
   // Logout Firebase
@@ -206,9 +302,7 @@ class _ScanStrukPageState extends State<ScanStrukPage> {
           children: [
             // Camera Preview
             if (_isCameraInitialized && _cameraController != null)
-              Positioned.fill(
-                child: CameraPreview(_cameraController!),
-              )
+              Positioned.fill(child: CameraPreview(_cameraController!))
             else
               const Center(
                 child: CircularProgressIndicator(color: Colors.white),
@@ -228,7 +322,10 @@ class _ScanStrukPageState extends State<ScanStrukPage> {
                       borderRadius: BorderRadius.circular(30),
                     ),
                     child: IconButton(
-                      icon: const Icon(Icons.photo_library, color: Colors.white),
+                      icon: const Icon(
+                        Icons.photo_library,
+                        color: Colors.white,
+                      ),
                       onPressed: _importImage,
                       tooltip: 'Import dari Galeri',
                     ),
@@ -262,10 +359,7 @@ class _ScanStrukPageState extends State<ScanStrukPage> {
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
                       color: Colors.white,
-                      border: Border.all(
-                        color: primaryColor,
-                        width: 4,
-                      ),
+                      border: Border.all(color: primaryColor, width: 4),
                     ),
                     child: const Icon(
                       Icons.camera_alt,
@@ -287,7 +381,10 @@ class _ScanStrukPageState extends State<ScanStrukPage> {
     return Scaffold(
       backgroundColor: darkBlue,
       appBar: AppBar(
-        title: const Text('Konfirmasi Gambar', style: TextStyle(color: Colors.white)),
+        title: const Text(
+          'Konfirmasi Gambar',
+          style: TextStyle(color: Colors.white),
+        ),
         backgroundColor: darkBlue,
         elevation: 0,
         leading: IconButton(
@@ -352,7 +449,10 @@ class _ScanStrukPageState extends State<ScanStrukPage> {
     return Scaffold(
       backgroundColor: darkBlue,
       appBar: AppBar(
-        title: const Text('Hasil Ekstraksi', style: TextStyle(color: Colors.white)),
+        title: const Text(
+          'Hasil Ekstraksi',
+          style: TextStyle(color: Colors.white),
+        ),
         backgroundColor: darkBlue,
         elevation: 0,
         leading: IconButton(
@@ -429,6 +529,26 @@ class _ScanStrukPageState extends State<ScanStrukPage> {
             ),
             const SizedBox(height: 20),
 
+            // Tombol gunakan data extracted
+            if (_extractedData.isNotEmpty)
+              ElevatedButton.icon(
+                onPressed: () {
+                  // Kirim data ke create activity screen
+                  Navigator.of(context).pop(_extractedData);
+                },
+                icon: const Icon(Icons.check_circle),
+                label: const Text('Gunakan Data Ini'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF00AA00),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+              ),
+            const SizedBox(height: 10),
+
             // Tombol scan lagi
             ElevatedButton.icon(
               onPressed: () {
@@ -436,6 +556,7 @@ class _ScanStrukPageState extends State<ScanStrukPage> {
                   _capturedImage = null;
                   _recognizedText = "";
                   _showConfirmation = false;
+                  _extractedData = {};
                 });
               },
               icon: const Icon(Icons.camera_alt),

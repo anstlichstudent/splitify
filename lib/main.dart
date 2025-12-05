@@ -12,6 +12,8 @@ import 'firebase_options.dart';
 // Halaman-halaman fitur
 import 'auth/signup_page.dart';
 import 'auth/login_page.dart';
+import 'page/scan_struk_page.dart';
+import 'page/create_activity_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -51,6 +53,10 @@ class MyApp extends StatelessWidget {
       ),
       // Tentukan halaman utama
       home: const AuthGate(),
+      routes: {
+        '/scan-struk': (context) => const ScanStrukPage(),
+        '/create-activity': (context) => const CreateActivityScreen(),
+      },
       debugShowCheckedModeBanner: false,
     );
   }
