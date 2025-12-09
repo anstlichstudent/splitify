@@ -1,20 +1,25 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import '../models/bill_item.dart';
+import '../data/models/bill_item.dart';
+import 'push_notification_service.dart';
 
 class ActivityService {
   final _firestore = FirebaseFirestore.instance;
   final _auth = FirebaseAuth.instance;
+  final _pushNotificationService = PushNotificationService();
 
   // ➕ Buat aktivitas baru
   Future<String> createActivity({
     required String activityName,
     required DateTime activityDate,
     required List<String> members,
+    required List<String>
+    memberUids, // UID dari member (exclude "Anda"/creator)
     required List<BillItem> items,
     required double taxPercent,
     required double servicePercent,
     required double discountNominal,
+    String? inputMethod, // 'scan' atau 'manual'
   }) async {
     final currentUser = _auth.currentUser;
 
@@ -24,6 +29,39 @@ class ActivityService {
         code: 'NOT_AUTHENTICATED',
         message: 'User harus login untuk membuat aktivitas.',
       );
+    }
+
+    // Hitung subtotal
+    final subtotal = items.fold<double>(0, (sum, item) => sum + item.price);
+
+    // Hitung tax, service, dan grandTotal
+    final tax = subtotal * (taxPercent / 100);
+    final service = subtotal * (servicePercent / 100);
+    final grandTotal = subtotal + tax + service - discountNominal;
+
+    // Hitung subtotal per member (hanya item mereka, tanpa tax/service/discount)
+    final memberSubtotals = <String, double>{};
+    for (final member in members) {
+      memberSubtotals[member] = 0;
+    }
+    for (final item in items) {
+      memberSubtotals[item.member] =
+          (memberSubtotals[item.member] ?? 0) + item.price;
+    }
+
+    // Hitung total per member dengan tax/service/discount di-distribute
+    final memberTotals = <String, double>{};
+    for (final member in members) {
+      final memberSubtotal = memberSubtotals[member] ?? 0;
+      final proportion = subtotal > 0 ? memberSubtotal / subtotal : 0;
+
+      // Total = subtotal + (tax * proportion) + (service * proportion) - (discount * proportion)
+      final memberTotal =
+          memberSubtotal +
+          (tax * proportion) +
+          (service * proportion) -
+          (discountNominal * proportion);
+      memberTotals[member] = memberTotal;
     }
 
     final docRef = await _firestore.collection('activities').add({
@@ -43,14 +81,68 @@ class ActivityService {
       'taxPercent': taxPercent,
       'servicePercent': servicePercent,
       'discountNominal': discountNominal,
+      'subtotal': subtotal,
+      'grandTotal': grandTotal,
+      'memberTotals': memberTotals,
+      'inputMethod': inputMethod, // 'scan' atau 'manual'
       'createdAt': FieldValue.serverTimestamp(),
       'updatedAt': FieldValue.serverTimestamp(),
     });
 
-    return docRef.id;
+    // Kirim invitasi ke member yang sudah punya UID
+    final activityId = docRef.id;
+    await _sendActivityInvitations(
+      activityId,
+      activityName,
+      memberUids,
+      currentUser.uid,
+    );
+
+    return activityId;
   }
 
-  // 📖 Ambil semua aktivitas user
+  // 📩 Kirim invitasi aktivitas ke member dengan UID yang sudah diketahui
+  Future<void> _sendActivityInvitations(
+    String activityId,
+    String activityName,
+    List<String> memberUids,
+    String createdByUid,
+  ) async {
+    // Get inviter name
+    final inviterDoc = await _firestore
+        .collection('users')
+        .doc(createdByUid)
+        .get();
+    final inviterName = inviterDoc.data()?['name'] ?? 'Someone';
+
+    // Kirim invitasi ke setiap member UID (exclude pembuat)
+    for (final memberUid in memberUids) {
+      if (memberUid == createdByUid) continue; // Skip pembuat aktivitas
+
+      try {
+        await _firestore.collection('activityInvitations').add({
+          'invitorUid': createdByUid,
+          'invitedUid': memberUid,
+          'activityId': activityId,
+          'activityName': activityName,
+          'status': 'pending', // 'pending', 'accepted', 'declined'
+          'createdAt': FieldValue.serverTimestamp(),
+          'respondedAt': null,
+        });
+
+        // 🔔 Kirim push notification
+        await _pushNotificationService.sendActivityInvitationNotification(
+          toUserId: memberUid,
+          activityId: activityId,
+          activityName: activityName,
+          inviterName: inviterName,
+        );
+      } catch (e) {
+        print('Error sending invitation to $memberUid: $e');
+      }
+    }
+  } // 📖 Ambil semua aktivitas user
+
   Future<List<Map<String, dynamic>>> getUserActivities() async {
     final currentUser = _auth.currentUser;
 
@@ -143,6 +235,16 @@ class ActivityService {
     }
   }
 
+  // Helper function untuk konversi number yang aman
+  double _toDouble(dynamic value) {
+    if (value == null) return 0.0;
+    if (value is double) return value;
+    if (value is int) return value.toDouble();
+    if (value is num) return value.toDouble();
+    if (value is String) return double.tryParse(value) ?? 0.0;
+    return 0.0;
+  }
+
   // 💰 Hitung total untuk setiap member
   Future<Map<String, double>> calculateMemberTotals({
     required String activityId,
@@ -153,15 +255,13 @@ class ActivityService {
     final items =
         (activity['items'] as List<dynamic>?)?.cast<Map<String, dynamic>>() ??
         [];
-    final taxPercent = (activity['taxPercent'] as num?)?.toDouble() ?? 0;
-    final servicePercent =
-        (activity['servicePercent'] as num?)?.toDouble() ?? 0;
-    final discountNominal =
-        (activity['discountNominal'] as num?)?.toDouble() ?? 0;
+    final taxPercent = _toDouble(activity['taxPercent']);
+    final servicePercent = _toDouble(activity['servicePercent']);
+    final discountNominal = _toDouble(activity['discountNominal']);
 
     final subtotal = items.fold<double>(
       0,
-      (sum, item) => sum + ((item['price'] as num?)?.toDouble() ?? 0),
+      (sum, item) => sum + _toDouble(item['price']),
     );
     if (subtotal == 0) return {};
 
@@ -171,7 +271,7 @@ class ActivityService {
     final memberSub = <String, double>{};
     for (final item in items) {
       final member = item['member'] as String?;
-      final price = (item['price'] as num?)?.toDouble() ?? 0;
+      final price = _toDouble(item['price']);
       if (member != null) {
         memberSub[member] = (memberSub[member] ?? 0) + price;
       }

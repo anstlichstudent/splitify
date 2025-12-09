@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:convert';
 import 'package:google_generative_ai/google_generative_ai.dart';
 
 class GeminiOCRService {
@@ -6,7 +7,7 @@ class GeminiOCRService {
   final String apiKey;
 
   GeminiOCRService({required this.apiKey}) {
-    _model = GenerativeModel(model: 'gemini-pro-vision', apiKey: apiKey);
+    _model = GenerativeModel(model: 'gemini-2.5-flash', apiKey: apiKey);
   }
 
   /// Extract text & items dari receipt image menggunakan Gemini Vision
@@ -19,28 +20,33 @@ class GeminiOCRService {
       final mimeType = _getMimeType(extension);
 
       const prompt = '''
-Analyze this receipt/invoice image and extract the following information in JSON format:
+Analyze this receipt/invoice image carefully. Extract ALL menu items with their prices and quantities.
 
+Return response as VALID JSON ONLY. No markdown, no explanation, no other text.
+
+Structure MUST be exactly:
 {
   "items": [
-    {
-      "name": "item name",
-      "price": 50000,
-      "quantity": 1
-    }
+    {"name": "item name", "price": 35000, "quantity": 1},
+    {"name": "another item", "price": 50000, "quantity": 2}
   ],
-  "subtotal": 50000,
+  "subtotal": 120000,
   "tax": 0,
   "service_charge": 0,
   "discount": 0,
-  "total": 50000,
-  "restaurant_name": "name if visible",
-  "date": "date if visible"
+  "total": 120000,
+  "restaurant_name": "restaurant name or empty",
+  "date": "date or empty"
 }
 
-Return ONLY valid JSON, no markdown or extra text.
-If a field is not found, use 0 for numbers or empty string for text.
-Prices should be in numeric format (e.g., 50000 not "50.000").
+CRITICAL:
+- Prices MUST be numbers (35000, NOT "35.000", NOT "Rp35000")
+- Calculate subtotal from all items: item.price * quantity
+- Extract tax, service, discount if present
+- Total = subtotal + tax + service - discount
+- If items empty, use empty array []
+- If field missing, use 0 for numbers or empty string for text
+- RETURN ONLY JSON, NOTHING ELSE
 ''';
 
       final response = await _model.generateContent([
@@ -55,6 +61,7 @@ Prices should be in numeric format (e.g., 50000 not "50.000").
     }
   }
 
+  // Helper untuk mendapatkan MIME type
   String _getMimeType(String extension) {
     switch (extension) {
       case 'jpg':
@@ -62,132 +69,77 @@ Prices should be in numeric format (e.g., 50000 not "50.000").
         return 'image/jpeg';
       case 'png':
         return 'image/png';
-      case 'gif':
-        return 'image/gif';
-      case 'webp':
-        return 'image/webp';
       default:
         return 'image/jpeg';
     }
   }
 
+  /// Membersihkan dan mem-parse string JSON dari Gemini
   Map<String, dynamic> _parseReceiptJson(String jsonString) {
+    // Model yang menggunakan schema cenderung mengembalikan JSON murni,
+    // tetapi kita tetap membersihkan blok kode markdown untuk keamanan.
+    String cleaned = jsonString
+        .replaceAll('```json', '')
+        .replaceAll('```', '')
+        .trim();
+
     try {
-      // Clean up response (remove markdown code blocks if present)
-      String cleaned = jsonString
-          .replaceAll('```json', '')
-          .replaceAll('```', '')
-          .trim();
+      final jsonMap = jsonDecode(cleaned) as Map<String, dynamic>;
 
-      // Simple JSON parsing
-      final jsonMap = _simpleJsonParse(cleaned);
-      return jsonMap;
+      print('✅ Successfully parsed JSON.');
+
+      // Normalisasi tipe data (misalnya, memastikan harga adalah int/double yang benar)
+      return _normalizeData(jsonMap);
     } catch (e) {
-      print('JSON Parse Error: $e');
-      return {
-        'items': [],
-        'subtotal': 0.0,
-        'tax': 0.0,
-        'service_charge': 0.0,
-        'discount': 0.0,
-        'total': 0.0,
-        'restaurant_name': '',
-        'date': '',
-      };
+      print('❌ JSON Decode Failed: $e');
+      print('Raw string: $cleaned');
+      throw Exception("Failed to decode final JSON structure.");
     }
   }
 
-  // Simple JSON parser untuk menangani response dari Gemini
-  Map<String, dynamic> _simpleJsonParse(String json) {
-    // Ini basic implementation - untuk production, gunakan proper JSON decoder
-    try {
-      // Try standard JSON decode dulu
-      // Sebenarnya bisa langsung pakai jsonDecode dari dart:convert
-      // Tapi untuk safety, kita handle manual parsing juga
+  // Mengubah data (seperti harga) ke tipe data yang konsisten (seperti double)
+  Map<String, dynamic> _normalizeData(Map<String, dynamic> data) {
+    // Menggunakan double untuk mata uang agar lebih fleksibel,
+    // meskipun kita meminta integer ke model.
+    final items =
+        (data['items'] as List<dynamic>?)
+            ?.map(
+              (item) => {
+                'name': item['name']?.toString() ?? 'Item',
+                'price': _toDouble(item['price']),
+                'quantity': _toInt(item['quantity']),
+              },
+            )
+            .toList() ??
+        [];
 
-      final Map<String, dynamic> result = {
-        'items': [],
-        'subtotal': 0.0,
-        'tax': 0.0,
-        'service_charge': 0.0,
-        'discount': 0.0,
-        'total': 0.0,
-        'restaurant_name': '',
-        'date': '',
-      };
-
-      // Extract items array
-      final itemsMatch = RegExp(
-        r'"items"\s*:\s*\[(.*?)\]',
-        dotAll: true,
-      ).firstMatch(json);
-      if (itemsMatch != null) {
-        final itemsJson = '[${itemsMatch.group(1)}]';
-        try {
-          // Parse items
-          List<Map<String, dynamic>> items = [];
-          final itemObjects = RegExp(
-            r'\{[^{}]*\}',
-          ).allMatches(itemsJson).map((m) => m.group(0)!).toList();
-
-          for (final itemStr in itemObjects) {
-            final name = _extractStringField(itemStr, 'name');
-            final price = _extractNumField(itemStr, 'price');
-            final quantity = _extractNumField(itemStr, 'quantity');
-
-            if (name.isNotEmpty && price > 0) {
-              items.add({
-                'name': name,
-                'price': price,
-                'quantity': quantity > 0 ? quantity : 1,
-              });
-            }
-          }
-          result['items'] = items;
-        } catch (e) {
-          print('Items parse error: $e');
-        }
-      }
-
-      // Extract numeric fields
-      result['subtotal'] = _extractNumField(json, 'subtotal');
-      result['tax'] = _extractNumField(json, 'tax');
-      result['service_charge'] = _extractNumField(json, 'service_charge');
-      result['discount'] = _extractNumField(json, 'discount');
-      result['total'] = _extractNumField(json, 'total');
-
-      // Extract string fields
-      result['restaurant_name'] = _extractStringField(json, 'restaurant_name');
-      result['date'] = _extractStringField(json, 'date');
-
-      return result;
-    } catch (e) {
-      print('Simple JSON parse failed: $e');
-      return {
-        'items': [],
-        'subtotal': 0.0,
-        'tax': 0.0,
-        'service_charge': 0.0,
-        'discount': 0.0,
-        'total': 0.0,
-        'restaurant_name': '',
-        'date': '',
-      };
-    }
+    return {
+      'items': items,
+      'subtotal': _toDouble(data['subtotal']),
+      'tax': _toDouble(data['tax']),
+      'service_charge': _toDouble(data['service_charge']),
+      'discount': _toDouble(data['discount']),
+      'total': _toDouble(data['total']),
+      'restaurant_name': data['restaurant_name']?.toString() ?? '',
+      'date': data['date']?.toString() ?? '',
+    };
   }
 
-  String _extractStringField(String json, String field) {
-    final pattern = RegExp('"$field"\\s*:\\s*"([^"]*)');
-    final match = pattern.firstMatch(json);
-    return match?.group(1) ?? '';
-  }
-
-  double _extractNumField(String json, String field) {
-    final pattern = RegExp('"$field"\\s*:\\s*(\\d+(?:\\.\\d+)?)');
-    final match = pattern.firstMatch(json);
-    if (match != null) {
-      return double.tryParse(match.group(1)!) ?? 0.0;
-    }
+  // Helper untuk konversi ke double
+  double _toDouble(dynamic value) {
+    if (value == null) return 0.0;
+    if (value is double) return value;
+    if (value is int) return value.toDouble();
+    if (value is String) return double.tryParse(value) ?? 0.0;
     return 0.0;
+  }
+
+  // Helper untuk konversi ke int
+  int _toInt(dynamic value) {
+    if (value == null) return 1;
+    if (value is int) return value;
+    if (value is double) return value.toInt();
+    if (value is String) return int.tryParse(value) ?? 1;
+    return 1;
   }
 }
