@@ -6,18 +6,20 @@ import 'dart:io';
 // Firebase Imports
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:splitify/page/dashboard_screen.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:splitify/presentation/screens/dashboard/dashboard_screen.dart';
+import 'package:splitify/services/notification_service.dart';
 import 'firebase_options.dart';
 
 // Halaman-halaman fitur
-import 'auth/signup_page.dart';
-import 'auth/login_page.dart';
-import 'page/scan_struk_page.dart';
-import 'page/create_activity_screen.dart';
+import 'presentation/screens/scan/scan_struk_page.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Initialize Firebase
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+
   // Debug info: pastikan Firebase berhasil diinisialisasi dan opsi tersedia
   try {
     debugPrint('Firebase apps count: ${Firebase.apps.length}');
@@ -27,6 +29,11 @@ void main() async {
   } catch (e) {
     debugPrint('Error printing Firebase debug info: $e');
   }
+
+  // 🔔 Initialize Notification Service
+  FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
+  await NotificationService().initialize();
+
   // Set orientasi (Opsional, jika Anda ingin memaksa portrait)
   await SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
   runApp(const MyApp());
@@ -53,10 +60,7 @@ class MyApp extends StatelessWidget {
       ),
       // Tentukan halaman utama
       home: const AuthGate(),
-      routes: {
-        '/scan-struk': (context) => const ScanStrukPage(),
-        '/create-activity': (context) => const CreateActivityScreen(),
-      },
+      routes: {'/scan-struk': (context) => const ScanStrukPage()},
       debugShowCheckedModeBanner: false,
     );
   }

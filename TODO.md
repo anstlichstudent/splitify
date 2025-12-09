@@ -1,5 +1,0 @@
-- [x] Add local state variables for torch and camera facing
-- [x] Update torch toggle IconButton to use local state
-- [x] Update camera switch IconButton to use local state and query after switch
-- [x] Add case for CameraFacing.external in switch
-- [x] Fix camera restart after failed scan
