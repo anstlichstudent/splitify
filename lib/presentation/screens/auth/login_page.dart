@@ -1,17 +1,21 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:splitify/presentation/screens/dashboard/dashboard_screen.dart';
+import '../../providers/auth_provider.dart';
+import '../../../core/constants/app_colors.dart';
+import '../../../domain/entities/user.dart' as domain;
 import 'signup_page.dart';
 
-class LoginScreen extends StatefulWidget {
+class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
 
   @override
-  _LoginScreenState createState() => _LoginScreenState();
+  ConsumerState<LoginScreen> createState() => _LoginScreenState();
 }
 
-class _LoginScreenState extends State<LoginScreen> {
+class _LoginScreenState extends ConsumerState<LoginScreen> {
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
@@ -20,43 +24,17 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _obscurePassword = true;
   bool _rememberMe = false;
 
-  // Email & Password login
+  // Email & Password login dengan Riverpod
   Future<void> _login() async {
     if (!_formKey.currentState!.validate()) return;
 
     final email = _emailController.text.trim();
     final password = _passwordController.text.trim();
 
-    setState(() => _isLoading = true);
+    // Use Riverpod auth notifier
+    await ref.read(authNotifierProvider.notifier).signIn(email, password);
+  } // ----------------- GOOGLE SIGN-IN -----------------
 
-    try {
-      await FirebaseAuth.instance.signInWithEmailAndPassword(
-        email: email,
-        password: password,
-      );
-
-      if (!mounted) return;
-
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => const DashboardScreen()),
-      );
-    } on FirebaseAuthException catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Login gagal: ${e.message}')));
-    } catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Terjadi error: $e')));
-    } finally {
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
-    }
-  }
-
-  // ----------------- GOOGLE SIGN-IN -----------------
   Future<void> _signInWithGoogle() async {
     setState(() {
       _isLoading = true;
@@ -170,6 +148,40 @@ class _LoginScreenState extends State<LoginScreen> {
   // UI
   @override
   Widget build(BuildContext context) {
+    // Listen to auth state changes for navigation
+    ref.listen<AsyncValue<domain.User?>>(authStateProvider, (previous, next) {
+      next.whenData((user) {
+        if (user != null && mounted) {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (context) => const DashboardScreen()),
+          );
+        }
+      });
+    });
+
+    // Listen to auth notifier for errors
+    ref.listen<AsyncValue<void>>(authNotifierProvider, (previous, next) {
+      next.when(
+        data: (_) {},
+        error: (error, stack) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Login gagal: $error'),
+                backgroundColor: AppColors.errorColor,
+              ),
+            );
+          }
+        },
+        loading: () {},
+      );
+    });
+
+    // Watch auth notifier state for loading indicator
+    final authState = ref.watch(authNotifierProvider);
+    final isLoading = authState.isLoading || _isLoading;
+
     const Color darkBlue = Color(0xFF000518);
     const Color primaryColor = Color(0xFF3B5BFF);
 
@@ -297,7 +309,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                     const SizedBox(height: 15),
                     ElevatedButton(
-                      onPressed: _isLoading ? null : _login,
+                      onPressed: isLoading ? null : _login,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: primaryColor,
                         padding: const EdgeInsets.symmetric(vertical: 16),
@@ -305,7 +317,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           borderRadius: BorderRadius.circular(12),
                         ),
                       ),
-                      child: _isLoading
+                      child: isLoading
                           ? const SizedBox(
                               width: 24,
                               height: 24,
@@ -333,7 +345,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     SizedBox(
                       width: double.infinity,
                       child: ElevatedButton.icon(
-                        onPressed: _isLoading ? null : _signInWithGoogle,
+                        onPressed: isLoading ? null : _signInWithGoogle,
                         icon: const Icon(Icons.g_mobiledata, size: 24),
                         label: const Text('Sign in with Google'),
                         style: ElevatedButton.styleFrom(
