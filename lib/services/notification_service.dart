@@ -244,4 +244,27 @@ class NotificationService {
       details,
     );
   }
+
+  /// Show receipt OCR completion notification
+  Future<void> showReceiptOCRCompleteNotification(int itemCount) async {
+    final androidDetails = AndroidNotificationDetails(
+      'receipt_channel',
+      'Receipt OCR',
+      channelDescription: 'Notifications for receipt OCR completion',
+      importance: Importance.high,
+      priority: Priority.high,
+      icon: '@mipmap/ic_launcher',
+      enableVibration: true,
+      playSound: true,
+    );
+
+    final details = NotificationDetails(android: androidDetails);
+
+    await _localNotifications.show(
+      1, // Unique ID for receipt notifications
+      '✅ Receipt OCR Complete',
+      '$itemCount items extracted! Ready to review.',
+      details,
+    );
+  }
 }
