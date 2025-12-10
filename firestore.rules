@@ -15,7 +15,14 @@ service cloud.firestore {
     // Users collection
     match /users/{userId} {
       allow read: if isSignedIn();
-      allow write: if isSignedIn() && isOwner(userId);
+      allow create, delete: if isSignedIn() && isOwner(userId);
+      // Allow any signed-in user to update ONLY the 'friends' field
+      allow update: if isSignedIn() && (
+        isOwner(userId) ||
+        // Allow non-owners to update only 'friends' field
+        (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['friends']) &&
+         request.resource.data['friends'].size() == resource.data.get('friends', []).size() + 1)
+      );
     }
     
     // Activities collection

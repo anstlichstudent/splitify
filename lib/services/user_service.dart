@@ -153,27 +153,28 @@ class UserService {
       );
     }
 
-    final batch = _firestore.batch();
+    // Gunakan transaction untuk memastikan atomicity
+    await _firestore.runTransaction((transaction) async {
+      // 1. Update status request menjadi accepted
+      final requestRef = _firestore.collection('friendRequests').doc(requestId);
+      transaction.update(requestRef, {
+        'status': 'accepted',
+        'respondedAt': FieldValue.serverTimestamp(),
+      });
 
-    // 1. Update status request menjadi accepted
-    final requestRef = _firestore.collection('friendRequests').doc(requestId);
-    batch.update(requestRef, {
-      'status': 'accepted',
-      'respondedAt': FieldValue.serverTimestamp(),
+      // 2. Tambahkan ke daftar friends kedua user
+      final currentUserRef = _firestore
+          .collection('users')
+          .doc(currentUser.uid);
+      transaction.update(currentUserRef, {
+        'friends': FieldValue.arrayUnion([fromUid]),
+      });
+
+      final friendRef = _firestore.collection('users').doc(fromUid);
+      transaction.update(friendRef, {
+        'friends': FieldValue.arrayUnion([currentUser.uid]),
+      });
     });
-
-    // 2. Tambahkan ke daftar friends kedua user
-    final currentUserRef = _firestore.collection('users').doc(currentUser.uid);
-    batch.update(currentUserRef, {
-      'friends': FieldValue.arrayUnion([fromUid]),
-    });
-
-    final friendRef = _firestore.collection('users').doc(fromUid);
-    batch.update(friendRef, {
-      'friends': FieldValue.arrayUnion([currentUser.uid]),
-    });
-
-    await batch.commit();
   }
 
   // ❌ Decline Friend Request

@@ -20,14 +20,12 @@ class GeminiOCRService {
       final mimeType = _getMimeType(extension);
 
       const prompt = '''
-Analyze this receipt/invoice image carefully. Extract ALL menu items with their prices and quantities.
+Analyze this receipt/invoice image carefully. Extract menu items with their prices and quantities.
+Return ONLY valid JSON with no markdown, no explanations.
 
-Return response as VALID JSON ONLY. No markdown, no explanation, no other text.
-
-Structure MUST be exactly:
 {
   "items": [
-    {"name": "item name", "price": 35000, "quantity": 1},
+    {"name": "item name", "price": 45000, "quantity": 1},
     {"name": "another item", "price": 50000, "quantity": 2}
   ],
   "subtotal": 120000,
@@ -35,18 +33,15 @@ Structure MUST be exactly:
   "service_charge": 0,
   "discount": 0,
   "total": 120000,
-  "restaurant_name": "restaurant name or empty",
-  "date": "date or empty"
+  "restaurant_name": "restaurant name",
+  "date": "date if visible"
 }
 
-CRITICAL:
-- Prices MUST be numbers (35000, NOT "35.000", NOT "Rp35000")
-- Calculate subtotal from all items: item.price * quantity
-- Extract tax, service, discount if present
-- Total = subtotal + tax + service - discount
-- If items empty, use empty array []
-- If field missing, use 0 for numbers or empty string for text
-- RETURN ONLY JSON, NOTHING ELSE
+Rules:
+- Extract ALL items with prices as whole numbers (35000, not "35.000")
+- Quantity defaults to 1 if not shown
+- Find subtotal, tax, service, discount, total
+- Return valid JSON ONLY, no other text
 ''';
 
       final response = await _model.generateContent([
@@ -54,9 +49,13 @@ CRITICAL:
       ]);
 
       final text = response.text ?? '';
-      return _parseReceiptJson(text);
+      print('📸 Gemini Response: $text');
+
+      final parsed = _parseReceiptJson(text);
+      print('✅ Parsed items: ${parsed['items']} | Total: ${parsed['total']}');
+      return parsed;
     } catch (e) {
-      print('Gemini OCR Error: $e');
+      print('❌ Gemini OCR Error: $e');
       rethrow;
     }
   }
@@ -76,8 +75,6 @@ CRITICAL:
 
   /// Membersihkan dan mem-parse string JSON dari Gemini
   Map<String, dynamic> _parseReceiptJson(String jsonString) {
-    // Model yang menggunakan schema cenderung mengembalikan JSON murni,
-    // tetapi kita tetap membersihkan blok kode markdown untuk keamanan.
     String cleaned = jsonString
         .replaceAll('```json', '')
         .replaceAll('```', '')
@@ -85,44 +82,67 @@ CRITICAL:
 
     try {
       final jsonMap = jsonDecode(cleaned) as Map<String, dynamic>;
-
-      print('✅ Successfully parsed JSON.');
-
-      // Normalisasi tipe data (misalnya, memastikan harga adalah int/double yang benar)
+      print('✅ JSON parsed successfully');
       return _normalizeData(jsonMap);
     } catch (e) {
-      print('❌ JSON Decode Failed: $e');
-      print('Raw string: $cleaned');
-      throw Exception("Failed to decode final JSON structure.");
+      print('❌ JSON Parse Error: $e');
+      print('Raw response was: $cleaned');
+
+      // Return minimal valid structure to prevent crash
+      return {
+        'items': [],
+        'subtotal': 0.0,
+        'tax': 0.0,
+        'service_charge': 0.0,
+        'discount': 0.0,
+        'total': 0.0,
+        'restaurant_name': '',
+        'date': '',
+      };
     }
   }
 
   // Mengubah data (seperti harga) ke tipe data yang konsisten (seperti double)
   Map<String, dynamic> _normalizeData(Map<String, dynamic> data) {
-    // Menggunakan double untuk mata uang agar lebih fleksibel,
-    // meskipun kita meminta integer ke model.
-    final items =
-        (data['items'] as List<dynamic>?)
-            ?.map(
-              (item) => {
-                'name': item['name']?.toString() ?? 'Item',
-                'price': _toDouble(item['price']),
-                'quantity': _toInt(item['quantity']),
-              },
-            )
-            .toList() ??
-        [];
+    try {
+      final itemsList = data['items'] as List<dynamic>? ?? [];
+      final items = itemsList.where((item) => item is Map<String, dynamic>).map(
+        (item) {
+          final itemMap = item as Map<String, dynamic>;
+          return {
+            'name': itemMap['name']?.toString() ?? 'Item',
+            'price': _toDouble(itemMap['price']),
+            'quantity': _toInt(itemMap['quantity']),
+          };
+        },
+      ).toList();
 
-    return {
-      'items': items,
-      'subtotal': _toDouble(data['subtotal']),
-      'tax': _toDouble(data['tax']),
-      'service_charge': _toDouble(data['service_charge']),
-      'discount': _toDouble(data['discount']),
-      'total': _toDouble(data['total']),
-      'restaurant_name': data['restaurant_name']?.toString() ?? '',
-      'date': data['date']?.toString() ?? '',
-    };
+      print('📊 Normalized: ${items.length} items');
+
+      return {
+        'items': items,
+        'subtotal': _toDouble(data['subtotal']),
+        'tax': _toDouble(data['tax']),
+        'service_charge': _toDouble(data['service_charge']),
+        'discount': _toDouble(data['discount']),
+        'total': _toDouble(data['total']),
+        'restaurant_name': data['restaurant_name']?.toString() ?? '',
+        'date': data['date']?.toString() ?? '',
+      };
+    } catch (e) {
+      print('⚠️ Normalization error: $e');
+      // Return safe defaults
+      return {
+        'items': [],
+        'subtotal': 0.0,
+        'tax': 0.0,
+        'service_charge': 0.0,
+        'discount': 0.0,
+        'total': 0.0,
+        'restaurant_name': '',
+        'date': '',
+      };
+    }
   }
 
   // Helper untuk konversi ke double

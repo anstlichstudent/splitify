@@ -8,6 +8,7 @@ import 'package:camera/camera.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:splitify/services/gemini_ocr_service.dart';
 import 'package:splitify/services/receipt_service.dart';
+import 'package:splitify/services/notification_service.dart';
 import 'package:splitify/config/app_config.dart' as config;
 
 class ScanStrukPage extends StatefulWidget {
@@ -178,29 +179,42 @@ class _ScanStrukPageState extends State<ScanStrukPage> {
         data = await _geminiOCR.extractReceiptData(_capturedImage!);
       } catch (geminiError) {
         // Catch jika terjadi masalah koneksi, API key, atau error di luar parsing
+        print('❌ Gemini OCR failed: $geminiError');
+        print('⚠️ Falling back to MLKit text recognition...');
 
-        print('❌ Gemini OCR failed due to external error: $geminiError');
-
-        data = _extractedData; // Tetap gunakan data lama/kosong
+        // Langsung fallback ke MLKit - extract raw text saja
+        await _processImageWithMLKit();
+        return;
       }
 
       // --- Cek Validitas Data Hasil Gemini ---
 
       final items = data['items'] as List? ?? [];
+      final total = (data['total'] as num?)?.toDouble() ?? 0.0;
+      final subtotal = (data['subtotal'] as num?)?.toDouble() ?? 0.0;
 
-      final total = data['total'] as num? ?? 0;
+      // Jika items kosong tapi ada total/subtotal, buat generic item
+      if (items.isEmpty && (total > 0 || subtotal > 0)) {
+        print('⚠️ Items kosong tapi ada total. Creating generic item...');
 
-      // Fallback jika data yang diekstrak *kosong*
+        final genericPrice = total > 0 ? total : subtotal;
+        data['items'] = [
+          {'name': 'Pesanan', 'price': genericPrice, 'quantity': 1},
+        ];
 
-      if (items.isEmpty && total == 0) {
-        print(
-          '⚠️ Gemini returned empty/invalid data. Falling back to MLKit...',
-        );
+        // Pastikan total konsisten
+        if (data['subtotal'] == 0) {
+          data['subtotal'] = genericPrice;
+        }
+        if (data['total'] == 0) {
+          data['total'] = genericPrice;
+        }
+      }
 
+      // Fallback jika BENAR2 kosong (no items AND no total)
+      if (items.isEmpty && total == 0 && subtotal == 0) {
+        print('⚠️ Truly empty data. Falling back to MLKit...');
         await _processImageWithMLKit();
-
-        // Setelah MLKit, _isProcessing akan menjadi false.
-
         return;
       }
 
@@ -256,13 +270,21 @@ class _ScanStrukPageState extends State<ScanStrukPage> {
       });
 
       if (mounted) {
+        final itemCount = (savedData['items'] as List).length;
+
+        // Show notification
+        await NotificationService().showReceiptOCRCompleteNotification(
+          itemCount,
+        );
+
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              'Receipt tersimpan & dimuat. Items: ${(savedData['items'] as List).length}',
+              '✅ Receipt OCR Complete! $itemCount items found. Ready to review.',
             ),
 
             backgroundColor: const Color(0xFF3B5BFF),
+            duration: const Duration(seconds: 3),
           ),
         );
       }
@@ -296,6 +318,18 @@ class _ScanStrukPageState extends State<ScanStrukPage> {
 
       setState(() {
         _recognizedText = extractedText;
+        // Set minimal extracted data agar bisa di-pass ke parent
+        _extractedData = {
+          'items': [],
+          'subtotal': 0,
+          'tax': 0,
+          'service_charge': 0,
+          'discount': 0,
+          'total': 0,
+          'restaurant_name': '',
+          'date': '',
+          'recognized_text': extractedText, // Add raw text untuk reference
+        };
         _isProcessing = false;
       });
     } on MissingPluginException {
@@ -307,6 +341,18 @@ class _ScanStrukPageState extends State<ScanStrukPage> {
       }
       setState(() {
         _recognizedText = msg;
+        // Set minimal extracted data even on error
+        _extractedData = {
+          'items': [],
+          'subtotal': 0,
+          'tax': 0,
+          'service_charge': 0,
+          'discount': 0,
+          'total': 0,
+          'restaurant_name': '',
+          'date': '',
+          'recognized_text': msg,
+        };
         _isProcessing = false;
       });
     } catch (e) {
@@ -317,6 +363,18 @@ class _ScanStrukPageState extends State<ScanStrukPage> {
       }
       setState(() {
         _recognizedText = "MLKit Error: $e";
+        // Set minimal extracted data even on error
+        _extractedData = {
+          'items': [],
+          'subtotal': 0,
+          'tax': 0,
+          'service_charge': 0,
+          'discount': 0,
+          'total': 0,
+          'restaurant_name': '',
+          'date': '',
+          'recognized_text': "MLKit Error: $e",
+        };
         _isProcessing = false;
       });
     }
@@ -652,6 +710,34 @@ class _ScanStrukPageState extends State<ScanStrukPage> {
                 ),
               ),
             ),
+
+            // Loading overlay saat processing
+            if (_isProcessing)
+              Positioned.fill(
+                child: Container(
+                  color: Colors.black.withOpacity(0.7),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const CircularProgressIndicator(color: Color(0xFF3B5BFF)),
+                      const SizedBox(height: 24),
+                      const Text(
+                        'Processing Receipt...',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      const Text(
+                        'Extracting items with AI',
+                        style: TextStyle(color: Colors.white70, fontSize: 14),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
           ],
         ),
       ),

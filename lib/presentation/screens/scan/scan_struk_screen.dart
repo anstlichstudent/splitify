@@ -125,7 +125,8 @@ class _ScanStrukState extends State<ScanStruk> {
             backgroundColor: Colors.green,
           ),
         );
-        Navigator.of(context).popUntil((route) => route.isFirst);
+        // Pop back to activity creation screen
+        Navigator.of(context).pop();
       }
     } catch (e) {
       if (mounted) {
