@@ -6,6 +6,10 @@ import 'package:splitify/presentation/screens/auth/login_page.dart';
 import 'package:splitify/presentation/screens/auth/signup_page.dart';
 import 'package:splitify/services/user_service.dart';
 import 'package:splitify/presentation/screens/profile/account_settings_screen.dart';
+import 'package:splitify/presentation/screens/profile/notification_settings_screen.dart';
+import 'package:splitify/presentation/screens/profile/privacy_settings_screen.dart';
+import 'package:splitify/presentation/screens/profile/help_support_screen.dart';
+import 'package:splitify/presentation/screens/profile/tos_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -392,7 +396,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   iconColor: primaryColor,
                   title: 'Notification Settings',
                   onTap: () {
-                    // TODO: Navigate to Notification Settings
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) =>
+                            const NotificationSettingsScreen(),
+                      ),
+                    );
                   },
                 ),
               ],
@@ -411,7 +421,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   iconColor: primaryColor,
                   title: 'Privacy Settings',
                   onTap: () {
-                    // TODO: Navigate to Privacy Settings
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const PrivacySettingsScreen(),
+                      ),
+                    );
                   },
                 ),
               ],
@@ -430,7 +445,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   iconColor: primaryColor,
                   title: 'Help & Support',
                   onTap: () {
-                    // TODO: Navigate to Help & Support
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const HelpSupportScreen(),
+                      ),
+                    );
                   },
                 ),
                 _buildDivider(),
@@ -440,7 +460,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   iconColor: primaryColor,
                   title: 'Terms of Service',
                   onTap: () {
-                    // TODO: Navigate to Terms of Service
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const TosScreen(),
+                      ),
+                    );
                   },
                 ),
               ],
