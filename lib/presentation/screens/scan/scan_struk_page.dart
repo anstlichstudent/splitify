@@ -10,6 +10,7 @@ import 'package:splitify/services/gemini_ocr_service.dart';
 import 'package:splitify/services/receipt_service.dart';
 import 'package:splitify/services/notification_service.dart';
 import 'package:splitify/config/app_config.dart' as config;
+import 'package:splitify/config/app_theme.dart';
 
 class ScanStrukPage extends StatefulWidget {
   const ScanStrukPage({super.key});
@@ -434,7 +435,7 @@ class _ScanStrukPageState extends State<ScanStrukPage> {
   }
 
   // Build widget untuk menampilkan data ekstraksi yang sudah diparse
-  Widget _buildExtractedDataDisplay(Color primaryColor) {
+  Widget _buildExtractedDataDisplay() {
     final items = _extractedData['items'] as List<dynamic>? ?? [];
     final subtotal = (_extractedData['subtotal'] as num?)?.toDouble() ?? 0.0;
     final tax = (_extractedData['tax'] as num?)?.toDouble() ?? 0.0;
@@ -445,58 +446,80 @@ class _ScanStrukPageState extends State<ScanStrukPage> {
 
     return Container(
       decoration: BoxDecoration(
-        color: const Color(0xFF1B2A41),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: primaryColor.withOpacity(0.3), width: 1),
+        color: AppTheme.surface,
+        borderRadius: BorderRadius.circular(AppTheme.cardRadius),
+        border: Border.all(color: Colors.white.withOpacity(0.05)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.2),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Items
-          if (items.isNotEmpty) ...[
-            const Text(
-              '📋 PESANAN',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 14,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 12),
-            ...items.asMap().entries.map((entry) {
-              final item = entry.value as Map<String, dynamic>;
-              final name = item['name'] ?? 'Item';
-              final price = (item['price'] as num?)?.toDouble() ?? 0.0;
-              final qty = (item['quantity'] as num?)?.toInt() ?? 1;
-              return Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Expanded(
-                      child: Text(
-                        '$name x$qty',
-                        style: const TextStyle(
-                          color: Colors.white70,
-                          fontSize: 13,
-                        ),
-                      ),
-                    ),
-                    Text(
-                      'Rp ${price.toStringAsFixed(0)}',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
+          // Header with Icon
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: AppTheme.primary.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(12),
                 ),
-              );
-            }).toList(),
-            const Divider(color: Colors.white10, height: 16),
-          ],
+                child: const Icon(
+                  Icons.receipt_long,
+                  color: AppTheme.primary,
+                  size: 20,
+                ),
+              ),
+              const SizedBox(width: 12),
+              const Text(
+                'Receipt Details',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
+          ...items.asMap().entries.map((entry) {
+            final item = entry.value as Map<String, dynamic>;
+            final name = item['name'] ?? 'Item';
+            final price = (item['price'] as num?)?.toDouble() ?? 0.0;
+            final qty = (item['quantity'] as num?)?.toInt() ?? 1;
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Expanded(
+                    child: Text(
+                      '$name x$qty',
+                      style: const TextStyle(
+                        color: Colors.white70,
+                        fontSize: 13,
+                      ),
+                    ),
+                  ),
+                  Text(
+                    'Rp ${price.toStringAsFixed(0)}',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }).toList(),
+          const Divider(color: Colors.white10, height: 16),
 
           // Summary
           const Text(
@@ -601,8 +624,8 @@ class _ScanStrukPageState extends State<ScanStrukPage> {
               ),
               Text(
                 'Rp ${total.toStringAsFixed(0)}',
-                style: TextStyle(
-                  color: primaryColor,
+                style: const TextStyle(
+                  color: AppTheme.primary,
                   fontSize: 14,
                   fontWeight: FontWeight.bold,
                 ),
@@ -616,8 +639,10 @@ class _ScanStrukPageState extends State<ScanStrukPage> {
 
   @override
   Widget build(BuildContext context) {
-    const Color darkBlue = Color(0xFF0D172A);
-    const Color primaryColor = Color(0xFF3B5BFF);
+    // ignore: unused_local_variable
+    const Color darkBlue = AppTheme.background;
+    // ignore: unused_local_variable
+    const Color primaryColor = AppTheme.primary;
 
     // Jika sedang menampilkan konfirmasi gambar
     if (_showConfirmation) {
@@ -631,7 +656,7 @@ class _ScanStrukPageState extends State<ScanStrukPage> {
 
     // Tampilan kamera utama
     return Scaffold(
-      backgroundColor: darkBlue,
+      backgroundColor: AppTheme.background,
       body: SafeArea(
         child: Stack(
           children: [
@@ -683,12 +708,12 @@ class _ScanStrukPageState extends State<ScanStrukPage> {
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
                       color: Colors.white,
-                      border: Border.all(color: primaryColor, width: 4),
+                      border: Border.all(color: AppTheme.primary, width: 4),
                     ),
                     child: const Icon(
                       Icons.camera_alt,
                       size: 32,
-                      color: Color(0xFF0D172A),
+                      color: AppTheme.background,
                     ),
                   ),
                 ),
@@ -737,7 +762,7 @@ class _ScanStrukPageState extends State<ScanStrukPage> {
           'Konfirmasi Gambar',
           style: TextStyle(color: Colors.white),
         ),
-        backgroundColor: darkBlue,
+        backgroundColor: AppTheme.background,
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.close, color: Colors.white),
@@ -844,11 +869,11 @@ class _ScanStrukPageState extends State<ScanStrukPage> {
                     ),
                   const SizedBox(height: 20),
                   if (_hasValidExtractedData())
-                    _buildExtractedDataDisplay(primaryColor)
+                    _buildExtractedDataDisplay()
                   else if (_extractedData.isNotEmpty)
                     Column(
                       children: [
-                        _buildExtractedDataDisplay(primaryColor),
+                        _buildExtractedDataDisplay(),
                         const SizedBox(height: 16),
                         Container(
                           padding: const EdgeInsets.all(12),
