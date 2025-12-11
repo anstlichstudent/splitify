@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'dart:io';
-import 'package:firebase_auth/firebase_auth.dart';
+
 import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:camera/camera.dart';
@@ -422,11 +422,6 @@ class _ScanStrukPageState extends State<ScanStrukPage> {
     return buffer.toString();
   }
 
-  // Logout Firebase
-  Future<void> _logout() async {
-    await FirebaseAuth.instance.signOut();
-  }
-
   bool _hasValidExtractedData() {
     if (_extractedData.isEmpty) return false;
 
@@ -670,17 +665,6 @@ class _ScanStrukPageState extends State<ScanStrukPage> {
                       tooltip: 'Import dari Galeri',
                     ),
                   ),
-                  Container(
-                    decoration: BoxDecoration(
-                      color: Colors.black54,
-                      borderRadius: BorderRadius.circular(30),
-                    ),
-                    child: IconButton(
-                      icon: const Icon(Icons.logout, color: Colors.white),
-                      onPressed: _logout,
-                      tooltip: 'Logout',
-                    ),
-                  ),
                 ],
               ),
             ),
@@ -833,12 +817,6 @@ class _ScanStrukPageState extends State<ScanStrukPage> {
             });
           },
         ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.logout, color: Colors.white),
-            onPressed: _logout,
-          ),
-        ],
       ),
       body: _isProcessing
           ? const Center(child: CircularProgressIndicator(color: Colors.white))
