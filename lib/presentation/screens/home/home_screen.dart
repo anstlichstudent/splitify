@@ -44,7 +44,10 @@ class _HomeScreenState extends State<HomeScreen> {
     try {
       final activities = await _activityService.getUserActivities();
       setState(() {
-        _activeActivities = activities;
+        // Filter only active activities (not completed)
+        _activeActivities = activities
+            .where((a) => (a['status'] ?? 'active') != 'completed')
+            .toList();
         _isLoading = false;
       });
     } catch (e) {
@@ -132,6 +135,8 @@ class _HomeScreenState extends State<HomeScreen> {
         activity['activityDate']?.toDate() ?? DateTime.now();
     final String formattedDate =
         '${activityDate.day} ${_getMonthName(activityDate.month)} ${activityDate.year}';
+    final String status = activity['status'] ?? 'active';
+    final bool isCompleted = status == 'completed';
 
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
@@ -200,16 +205,22 @@ class _HomeScreenState extends State<HomeScreen> {
                           vertical: 6,
                         ),
                         decoration: BoxDecoration(
-                          color: AppTheme.primary.withOpacity(0.1),
+                          color: isCompleted
+                              ? Colors.green.withOpacity(0.1)
+                              : AppTheme.primary.withOpacity(0.1),
                           borderRadius: BorderRadius.circular(20),
                           border: Border.all(
-                            color: AppTheme.primary.withOpacity(0.3),
+                            color: isCompleted
+                                ? Colors.green.withOpacity(0.3)
+                                : AppTheme.primary.withOpacity(0.3),
                           ),
                         ),
-                        child: const Text(
-                          'Active',
+                        child: Text(
+                          isCompleted ? 'Selesai' : 'Aktif',
                           style: TextStyle(
-                            color: AppTheme.primary,
+                            color: isCompleted
+                                ? Colors.green
+                                : AppTheme.primary,
                             fontSize: 12,
                             fontWeight: FontWeight.w600,
                           ),
@@ -393,52 +404,19 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
                 const SizedBox(height: 20),
 
-                // Daftar Kegiatan
+                const SizedBox(height: 20),
+
                 if (_isLoading)
                   const Center(
                     child: CircularProgressIndicator(color: Colors.white),
                   )
-                else if (_activeActivities.isEmpty)
-                  Center(
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 40),
-                      child: Column(
-                        children: [
-                          const Icon(
-                            Icons.inbox_outlined,
-                            size: 64,
-                            color: Colors.white30,
-                          ),
-                          const SizedBox(height: 16),
-                          const Text(
-                            'Belum ada aktivitas',
-                            style: TextStyle(
-                              color: Colors.white54,
-                              fontSize: 16,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          const Text(
-                            'Buat aktivitas baru untuk memulai',
-                            style: TextStyle(
-                              color: Colors.white30,
-                              fontSize: 12,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  )
                 else
-                  ListView.builder(
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    itemCount: _activeActivities.length,
-                    itemBuilder: (context, index) {
-                      return _buildActivityCard(_activeActivities[index]);
-                    },
+                  _buildActivityList(
+                    _activeActivities,
+                    'Belum ada aktivitas berjalan',
                   ),
-                const SizedBox(height: 20),
+
+                const SizedBox(height: 100), // bottom spacing
               ],
             ),
           ),
@@ -471,6 +449,37 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildActivityList(
+    List<Map<String, dynamic>> activities,
+    String emptyMessage,
+  ) {
+    if (activities.isEmpty) {
+      return Center(
+        child: Column(
+          children: [
+            const SizedBox(height: 40),
+            const Icon(Icons.inbox_outlined, size: 64, color: Colors.white30),
+            const SizedBox(height: 16),
+            Text(
+              emptyMessage,
+              style: const TextStyle(color: Colors.white54, fontSize: 16),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return ListView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      itemCount: activities.length,
+      padding: EdgeInsets.zero,
+      itemBuilder: (context, index) {
+        return _buildActivityCard(activities[index]);
+      },
     );
   }
 }

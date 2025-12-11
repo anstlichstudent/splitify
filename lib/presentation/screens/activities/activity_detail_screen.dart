@@ -106,92 +106,142 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
         iconTheme: const IconThemeData(color: Colors.white),
         elevation: 0,
         actions: [
-          PopupMenuButton<String>(
-            onSelected: (value) async {
-              if (value == 'edit') {
-                // Get current activity data
-                final activity = await _activityFuture;
-                if (activity == null || !mounted) return;
+          FutureBuilder<Map<String, dynamic>?>(
+            future: _activityFuture,
+            builder: (context, snapshot) {
+              final isCompleted =
+                  snapshot.data != null &&
+                  snapshot.data!['status'] == 'completed';
 
-                final members = List<String>.from(activity['members'] ?? []);
-                // Convert Map items to BillItem objects
-                List<BillItem> billItems = [];
-                if (activity['items'] != null) {
-                  for (var item in activity['items']) {
-                    if (item is Map<String, dynamic>) {
-                      billItems.add(
-                        BillItem(
-                          member: item['member'] ?? 'Unknown',
-                          name: item['name'] ?? 'Item',
-                          price: _toDouble(item['price']),
+              return PopupMenuButton<String>(
+                onSelected: (value) async {
+                  if (value == 'edit') {
+                    // Copied edit logic... (omitted for brevity, assume existing logic)
+                    // Get current activity data
+                    final activity = await _activityFuture;
+                    if (activity == null || !mounted) return;
+
+                    final members = List<String>.from(
+                      activity['members'] ?? [],
+                    );
+                    List<BillItem> billItems = [];
+                    if (activity['items'] != null) {
+                      for (var item in activity['items']) {
+                        if (item is Map<String, dynamic>) {
+                          billItems.add(
+                            BillItem(
+                              member: item['member'] ?? 'Unknown',
+                              name: item['name'] ?? 'Item',
+                              price: _toDouble(item['price']),
+                            ),
+                          );
+                        }
+                      }
+                    }
+
+                    final taxPercent = _toDouble(activity['taxPercent']);
+                    final servicePercent = _toDouble(
+                      activity['servicePercent'],
+                    );
+                    final discountNominal = _toDouble(
+                      activity['discountNominal'],
+                    );
+                    final activityName =
+                        activity['activityName'] ?? 'Aktivitas';
+
+                    DateTime activityDate;
+                    try {
+                      if (activity['activityDate'] is DateTime) {
+                        activityDate = activity['activityDate'];
+                      } else if (activity['activityDate'] != null) {
+                        try {
+                          activityDate = activity['activityDate'].toDate();
+                        } catch (e) {
+                          activityDate = DateTime.parse(
+                            activity['activityDate'].toString(),
+                          );
+                        }
+                      } else {
+                        activityDate = DateTime.now();
+                      }
+                    } catch (e) {
+                      activityDate = DateTime.now();
+                    }
+
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => ManualInputScreen(
+                          activityId: widget.activityId,
+                          activityName: activityName,
+                          activityDate: activityDate,
+                          members: members,
+                          memberUids: const [],
+                          initialItems: billItems,
+                          initialTax: taxPercent,
+                          initialService: servicePercent,
+                          initialDiscount: discountNominal,
+                        ),
+                      ),
+                    ).then((_) {
+                      setState(() {
+                        _activityFuture = _activityService.getActivityById(
+                          widget.activityId,
+                        );
+                      });
+                    });
+                  } else if (value == 'toggle_status') {
+                    final activity = await _activityFuture;
+                    if (activity == null || !mounted) return;
+
+                    final currentIsCompleted =
+                        activity['status'] == 'completed';
+                    await _activityService.updateActivityStatus(
+                      widget.activityId,
+                      currentIsCompleted ? 'active' : 'completed',
+                    );
+
+                    setState(() {
+                      _activityFuture = _activityService.getActivityById(
+                        widget.activityId,
+                      );
+                    });
+
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(
+                            currentIsCompleted
+                                ? 'Aktivitas ditandai aktif kembali'
+                                : 'Aktivitas ditandai selesai',
+                          ),
+                          backgroundColor: currentIsCompleted
+                              ? Colors.blue
+                              : Colors.green,
                         ),
                       );
                     }
+                  } else if (value == 'delete') {
+                    _showDeleteConfirmation(context);
                   }
-                }
-
-                // Retrieve values
-                final taxPercent = _toDouble(activity['taxPercent']);
-                final servicePercent = _toDouble(activity['servicePercent']);
-                final discountNominal = _toDouble(activity['discountNominal']);
-                final activityName = activity['activityName'] ?? 'Aktivitas';
-
-                // Handle Date
-                DateTime activityDate;
-                try {
-                  if (activity['activityDate'] is DateTime) {
-                    activityDate = activity['activityDate'];
-                  } else if (activity['activityDate'] != null) {
-                    // Firestore Timestamp
-                    try {
-                      activityDate = activity['activityDate'].toDate();
-                    } catch (e) {
-                      // Fallback: try to parse as string
-                      activityDate = DateTime.parse(
-                        activity['activityDate'].toString(),
-                      );
-                    }
-                  } else {
-                    activityDate = DateTime.now();
-                  }
-                } catch (e) {
-                  activityDate = DateTime.now();
-                }
-
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => ManualInputScreen(
-                      activityId: widget.activityId,
-                      activityName: activityName,
-                      activityDate: activityDate,
-                      members: members,
-                      memberUids: const [], // Not needed for update
-                      initialItems: billItems,
-                      initialTax: taxPercent,
-                      initialService: servicePercent,
-                      initialDiscount: discountNominal,
+                },
+                itemBuilder: (context) {
+                  return [
+                    const PopupMenuItem(value: 'edit', child: Text('Edit')),
+                    PopupMenuItem(
+                      value: 'toggle_status',
+                      child: Text(
+                        isCompleted ? 'Tandai Aktif' : 'Tandai Selesai',
+                      ),
                     ),
-                  ),
-                ).then((_) {
-                  // Refresh data after return
-                  setState(() {
-                    _activityFuture = _activityService.getActivityById(
-                      widget.activityId,
-                    );
-                  });
-                });
-              } else if (value == 'delete') {
-                _showDeleteConfirmation(context);
-              }
+                    const PopupMenuItem(
+                      value: 'delete',
+                      child: Text('Hapus', style: TextStyle(color: Colors.red)),
+                    ),
+                  ];
+                },
+              );
             },
-            itemBuilder: (context) => [
-              const PopupMenuItem(value: 'edit', child: Text('Edit')),
-              const PopupMenuItem(
-                value: 'delete',
-                child: Text('Hapus', style: TextStyle(color: Colors.red)),
-              ),
-            ],
           ),
         ],
       ),

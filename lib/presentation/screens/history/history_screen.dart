@@ -13,7 +13,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
   final ActivityService _activityService = ActivityService();
   List<Map<String, dynamic>> _allActivities = [];
   bool _isLoading = true;
-  
+
   String _selectedFilter = 'all'; // 'all', 'week', 'month', 'year'
   String _selectedStatus = 'all'; // 'all', 'active', 'completed'
   String _searchQuery = '';
@@ -46,9 +46,9 @@ class _HistoryScreenState extends State<HistoryScreen> {
       });
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error loading activities: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error loading activities: $e')));
       }
       setState(() {
         _isLoading = false;
@@ -74,47 +74,44 @@ class _HistoryScreenState extends State<HistoryScreen> {
 
   bool _matchesStatus(Map<String, dynamic> activity) {
     if (_selectedStatus == 'all') return true;
-    
-    // Anggap aktivitas completed jika semua items sudah tercatat
-    // Untuk sekarang, gunakan heuristic: jika sudah ada grandTotal dan >0
-    final isActive = activity['grandTotal'] != null && activity['grandTotal'] > 0;
-    
-    return _selectedStatus == 'active' ? isActive : !isActive;
+
+    final status = activity['status'] ?? 'active';
+    return _selectedStatus == status;
   }
 
   List<Map<String, dynamic>> get _filteredActivities {
     return _allActivities.where((activity) {
       final activityDate = activity['activityDate']?.toDate() ?? DateTime.now();
       final activityName = (activity['activityName'] ?? '').toLowerCase();
-      
+
       final matchesDate = _isWithinDateRange(activityDate);
       final matchesStatus = _matchesStatus(activity);
       final matchesSearch = activityName.contains(_searchQuery);
-      
+
       return matchesDate && matchesStatus && matchesSearch;
     }).toList();
   }
 
   Map<String, List<Map<String, dynamic>>> get _groupedByDate {
     final grouped = <String, List<Map<String, dynamic>>>{};
-    
+
     for (final activity in _filteredActivities) {
       final date = activity['activityDate']?.toDate() ?? DateTime.now();
       final dateKey = _getDateGroup(date);
-      
+
       grouped.putIfAbsent(dateKey, () => []);
       grouped[dateKey]!.add(activity);
     }
-    
+
     // Sort dates by recency
     final sortedGroups = <String, List<Map<String, dynamic>>>{};
     final orderedKeys = grouped.keys.toList()
       ..sort((a, b) => _getDateGroupValue(b).compareTo(_getDateGroupValue(a)));
-    
+
     for (final key in orderedKeys) {
       sortedGroups[key] = grouped[key]!;
     }
-    
+
     return sortedGroups;
   }
 
@@ -122,24 +119,30 @@ class _HistoryScreenState extends State<HistoryScreen> {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
     final dateOnly = DateTime(date.year, date.month, date.day);
-    
+
     if (dateOnly == today) return 'Hari Ini';
     if (dateOnly == today.subtract(const Duration(days: 1))) return 'Kemarin';
     if (now.difference(dateOnly).inDays <= 7) return 'Minggu Ini';
     if (now.difference(dateOnly).inDays <= 30) return 'Bulan Ini';
     if (dateOnly.year == today.year) return 'Tahun Ini';
-    
+
     return '${dateOnly.year}';
   }
 
   int _getDateGroupValue(String group) {
     switch (group) {
-      case 'Hari Ini': return 0;
-      case 'Kemarin': return 1;
-      case 'Minggu Ini': return 2;
-      case 'Bulan Ini': return 3;
-      case 'Tahun Ini': return 4;
-      default: return 5;
+      case 'Hari Ini':
+        return 0;
+      case 'Kemarin':
+        return 1;
+      case 'Minggu Ini':
+        return 2;
+      case 'Bulan Ini':
+        return 3;
+      case 'Tahun Ini':
+        return 4;
+      default:
+        return 5;
     }
   }
 
@@ -167,7 +170,20 @@ class _HistoryScreenState extends State<HistoryScreen> {
   }
 
   String _getMonthName(int month) {
-    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const months = [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
+    ];
     return months[month - 1];
   }
 
@@ -201,7 +217,10 @@ class _HistoryScreenState extends State<HistoryScreen> {
                       decoration: InputDecoration(
                         hintText: 'Cari aktivitas...',
                         hintStyle: const TextStyle(color: Colors.white38),
-                        prefixIcon: const Icon(Icons.search, color: Colors.white54),
+                        prefixIcon: const Icon(
+                          Icons.search,
+                          color: Colors.white54,
+                        ),
                         filled: true,
                         fillColor: const Color(0xFF1B2A41),
                         border: OutlineInputBorder(
@@ -291,7 +310,9 @@ class _HistoryScreenState extends State<HistoryScreen> {
                         decoration: BoxDecoration(
                           color: primaryColor.withOpacity(0.15),
                           borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: primaryColor.withOpacity(0.3)),
+                          border: Border.all(
+                            color: primaryColor.withOpacity(0.3),
+                          ),
                         ),
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.spaceAround,
@@ -300,7 +321,10 @@ class _HistoryScreenState extends State<HistoryScreen> {
                               children: [
                                 const Text(
                                   'Total Aktivitas',
-                                  style: TextStyle(color: Colors.white70, fontSize: 12),
+                                  style: TextStyle(
+                                    color: Colors.white70,
+                                    fontSize: 12,
+                                  ),
                                 ),
                                 const SizedBox(height: 4),
                                 Text(
@@ -322,7 +346,10 @@ class _HistoryScreenState extends State<HistoryScreen> {
                               children: [
                                 const Text(
                                   'Total Pengeluaran',
-                                  style: TextStyle(color: Colors.white70, fontSize: 12),
+                                  style: TextStyle(
+                                    color: Colors.white70,
+                                    fontSize: 12,
+                                  ),
                                 ),
                                 const SizedBox(height: 4),
                                 Text(
@@ -351,14 +378,20 @@ class _HistoryScreenState extends State<HistoryScreen> {
                           const SizedBox(height: 16),
                           const Text(
                             'Belum ada aktivitas',
-                            style: TextStyle(color: Colors.white54, fontSize: 16),
+                            style: TextStyle(
+                              color: Colors.white54,
+                              fontSize: 16,
+                            ),
                           ),
                         ],
                       ),
                     )
                   else
                     Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 8,
+                      ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: _groupedByDate.entries.map((entry) {
@@ -370,7 +403,9 @@ class _HistoryScreenState extends State<HistoryScreen> {
                             children: [
                               // Date Group Header
                               Padding(
-                                padding: const EdgeInsets.symmetric(vertical: 12),
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 12,
+                                ),
                                 child: Text(
                                   dateGroup,
                                   style: const TextStyle(
@@ -382,10 +417,16 @@ class _HistoryScreenState extends State<HistoryScreen> {
                               ),
                               // Activities in this group
                               ...activities.map((activity) {
-                                final activityName = activity['activityName'] ?? 'Aktivitas';
-                                final activityDate = activity['activityDate']?.toDate() ?? DateTime.now();
-                                final grandTotal = _toDouble(activity['grandTotal']);
-                                final formattedDate = '${activityDate.day} ${_getMonthName(activityDate.month)}';
+                                final activityName =
+                                    activity['activityName'] ?? 'Aktivitas';
+                                final activityDate =
+                                    activity['activityDate']?.toDate() ??
+                                    DateTime.now();
+                                final grandTotal = _toDouble(
+                                  activity['grandTotal'],
+                                );
+                                final formattedDate =
+                                    '${activityDate.day} ${_getMonthName(activityDate.month)}';
 
                                 return Card(
                                   color: const Color(0xFF1B2A41),
@@ -399,20 +440,25 @@ class _HistoryScreenState extends State<HistoryScreen> {
                                       Navigator.push(
                                         context,
                                         MaterialPageRoute(
-                                          builder: (context) => ActivityDetailScreen(
-                                            activityId: activity['id'],
-                                          ),
+                                          builder: (context) =>
+                                              ActivityDetailScreen(
+                                                activityId: activity['id'],
+                                              ),
                                         ),
                                       ).then((_) => _loadActivities());
                                     },
                                     borderRadius: BorderRadius.circular(12),
                                     child: Padding(
-                                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 16,
+                                        vertical: 12,
+                                      ),
                                       child: Row(
                                         children: [
                                           Expanded(
                                             child: Column(
-                                              crossAxisAlignment: CrossAxisAlignment.start,
+                                              crossAxisAlignment:
+                                                  CrossAxisAlignment.start,
                                               children: [
                                                 Text(
                                                   activityName,
@@ -439,28 +485,45 @@ class _HistoryScreenState extends State<HistoryScreen> {
                                                       ),
                                                     ),
                                                     const SizedBox(width: 12),
-                                                    if (activity['inputMethod'] != null)
+                                                    if (activity['inputMethod'] !=
+                                                        null)
                                                       Container(
-                                                        padding: const EdgeInsets.symmetric(
-                                                          horizontal: 6,
-                                                          vertical: 2,
-                                                        ),
+                                                        padding:
+                                                            const EdgeInsets.symmetric(
+                                                              horizontal: 6,
+                                                              vertical: 2,
+                                                            ),
                                                         decoration: BoxDecoration(
-                                                          color: activity['inputMethod'] == 'scan'
-                                                              ? Colors.green.withOpacity(0.2)
-                                                              : Colors.blue.withOpacity(0.2),
-                                                          borderRadius: BorderRadius.circular(4),
+                                                          color:
+                                                              activity['inputMethod'] ==
+                                                                  'scan'
+                                                              ? Colors.green
+                                                                    .withOpacity(
+                                                                      0.2,
+                                                                    )
+                                                              : Colors.blue
+                                                                    .withOpacity(
+                                                                      0.2,
+                                                                    ),
+                                                          borderRadius:
+                                                              BorderRadius.circular(
+                                                                4,
+                                                              ),
                                                         ),
                                                         child: Text(
-                                                          activity['inputMethod'] == 'scan'
+                                                          activity['inputMethod'] ==
+                                                                  'scan'
                                                               ? 'Scan'
                                                               : 'Manual',
                                                           style: TextStyle(
-                                                            color: activity['inputMethod'] == 'scan'
+                                                            color:
+                                                                activity['inputMethod'] ==
+                                                                    'scan'
                                                                 ? Colors.green
                                                                 : Colors.blue,
                                                             fontSize: 10,
-                                                            fontWeight: FontWeight.w500,
+                                                            fontWeight:
+                                                                FontWeight.w500,
                                                           ),
                                                         ),
                                                       ),
@@ -470,7 +533,8 @@ class _HistoryScreenState extends State<HistoryScreen> {
                                             ),
                                           ),
                                           Column(
-                                            crossAxisAlignment: CrossAxisAlignment.end,
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.end,
                                             children: [
                                               Text(
                                                 'Rp ${_formatCurrency(grandTotal.toInt())}',
@@ -482,18 +546,36 @@ class _HistoryScreenState extends State<HistoryScreen> {
                                               ),
                                               const SizedBox(height: 4),
                                               Container(
-                                                padding: const EdgeInsets.symmetric(
-                                                  horizontal: 8,
-                                                  vertical: 4,
-                                                ),
+                                                padding:
+                                                    const EdgeInsets.symmetric(
+                                                      horizontal: 8,
+                                                      vertical: 4,
+                                                    ),
                                                 decoration: BoxDecoration(
-                                                  color: Color(0xFF3B5BFF).withOpacity(0.2),
-                                                  borderRadius: BorderRadius.circular(6),
+                                                  color:
+                                                      (activity['status'] ==
+                                                          'completed')
+                                                      ? Colors.green
+                                                            .withOpacity(0.2)
+                                                      : const Color(
+                                                          0xFF3B5BFF,
+                                                        ).withOpacity(0.2),
+                                                  borderRadius:
+                                                      BorderRadius.circular(6),
                                                 ),
-                                                child: const Text(
-                                                  'Aktif',
+                                                child: Text(
+                                                  (activity['status'] ==
+                                                          'completed')
+                                                      ? 'Selesai'
+                                                      : 'Aktif',
                                                   style: TextStyle(
-                                                    color: Color(0xFF3B5BFF),
+                                                    color:
+                                                        (activity['status'] ==
+                                                            'completed')
+                                                        ? Colors.green
+                                                        : const Color(
+                                                            0xFF3B5BFF,
+                                                          ),
                                                     fontSize: 11,
                                                     fontWeight: FontWeight.w600,
                                                   ),

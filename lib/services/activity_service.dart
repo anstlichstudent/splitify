@@ -85,6 +85,7 @@ class ActivityService {
       'grandTotal': grandTotal,
       'memberTotals': memberTotals,
       'inputMethod': inputMethod, // 'scan' atau 'manual'
+      'status': 'active', // 'active' atau 'completed'
       'createdAt': FieldValue.serverTimestamp(),
       'updatedAt': FieldValue.serverTimestamp(),
     });
@@ -254,6 +255,14 @@ class ActivityService {
       'subtotal': subtotal,
       'grandTotal': grandTotal,
       'memberTotals': memberTotals,
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
+  }
+
+  // 🏁 Update status aktivitas
+  Future<void> updateActivityStatus(String activityId, String status) async {
+    await _firestore.collection('activities').doc(activityId).update({
+      'status': status,
       'updatedAt': FieldValue.serverTimestamp(),
     });
   }
