@@ -11,6 +11,7 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:splitify/presentation/screens/dashboard/dashboard_screen.dart';
 import 'package:splitify/services/notification_service.dart';
 import 'firebase_options.dart';
+import 'package:splitify/config/app_theme.dart';
 
 // Halaman-halaman fitur
 import 'presentation/screens/scan/scan_struk_page.dart';
@@ -53,17 +54,7 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       title: 'Splitify App',
       // Mengatur tema dasar aplikasi, menggunakan tema gelap agar konsisten dengan Login/Signup
-      theme: ThemeData(
-        brightness: Brightness.dark, // Gunakan Dark Theme
-        primarySwatch: Colors.blue,
-        useMaterial3: true,
-        // Atur warna fokus input field menjadi biru terang
-        inputDecorationTheme: const InputDecorationTheme(
-          focusedBorder: OutlineInputBorder(
-            borderSide: BorderSide(color: Color(0xFF3B5BFF)),
-          ),
-        ),
-      ),
+      theme: AppTheme.darkTheme,
       // Tentukan halaman utama
       home: const AuthGate(),
       routes: {'/scan-struk': (context) => const ScanStrukPage()},
