@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:splitify/presentation/screens/friends/add-friends-screen.dart';
 import 'package:splitify/presentation/screens/friends/friends_list_screen.dart';
 import 'package:splitify/services/activity_service.dart';
+import 'package:splitify/config/app_theme.dart';
 import '../activities/create_activity_screen.dart';
 import '../activities/activity_detail_screen.dart';
 
@@ -124,9 +125,6 @@ class _HomeScreenState extends State<HomeScreen> {
 
   // Helper Widget untuk setiap item aktivitas
   Widget _buildActivityCard(Map<String, dynamic> activity) {
-    const Color inputFieldColor = Color(0xFF1B2A41);
-    const Color primaryColor = Color(0xFF3B5BFF);
-
     final String activityId = activity['id'] ?? '';
     final String activityName = activity['activityName'] ?? 'Unnamed Activity';
     final double grandTotal = _toDouble(activity['grandTotal']);
@@ -135,97 +133,115 @@ class _HomeScreenState extends State<HomeScreen> {
     final String formattedDate =
         '${activityDate.day} ${_getMonthName(activityDate.month)} ${activityDate.year}';
 
-    return Card(
-      color: inputFieldColor,
-      elevation: 0,
-      margin: const EdgeInsets.only(bottom: 12),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: InkWell(
-        onTap: () {
-          // Debug: cek activityId
-          if (activityId.isEmpty) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Error: Activity ID tidak ditemukan'),
-                backgroundColor: Colors.red,
-              ),
-            );
-            return;
-          }
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      decoration: BoxDecoration(
+        color: AppTheme.surface,
+        borderRadius: BorderRadius.circular(AppTheme.cardRadius),
+        border: Border.all(color: Colors.white.withOpacity(0.05)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.2),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () {
+            // Debug: cek activityId
+            if (activityId.isEmpty) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Error: Activity ID tidak ditemukan'),
+                  backgroundColor: Colors.red,
+                ),
+              );
+              return;
+            }
 
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) =>
-                  ActivityDetailScreen(activityId: activityId),
-            ),
-          ).then((_) {
-            // Refresh aktivitas setelah kembali dari detail/edit
-            _loadActivities();
-          });
-        },
-        onLongPress: () {
-          _showActivityMenu(context, activityId, activityName);
-        },
-        borderRadius: BorderRadius.circular(12),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-          child: Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) =>
+                    ActivityDetailScreen(activityId: activityId),
+              ),
+            ).then((_) {
+              // Refresh aktivitas setelah kembali dari detail/edit
+              _loadActivities();
+            });
+          },
+          onLongPress: () {
+            _showActivityMenu(context, activityId, activityName);
+          },
+          borderRadius: BorderRadius.circular(12),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        activityName,
+                        style: const TextStyle(
+                          color: AppTheme.textPrimary,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 18,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 6,
+                        ),
+                        decoration: BoxDecoration(
+                          color: AppTheme.primary.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(
+                            color: AppTheme.primary.withOpacity(0.3),
+                          ),
+                        ),
+                        child: const Text(
+                          'Active',
+                          style: TextStyle(
+                            color: AppTheme.primary,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Text(
-                      activityName,
+                      'Rp ${_formatCurrency(grandTotal.toInt())}',
                       style: const TextStyle(
-                        color: Colors.white,
+                        color: AppTheme.textPrimary,
                         fontWeight: FontWeight.bold,
-                        fontSize: 16,
+                        fontSize: 18,
                       ),
                     ),
-                    const SizedBox(height: 8),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 4,
-                      ),
-                      decoration: BoxDecoration(
-                        color: primaryColor.withOpacity(0.2),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: const Text(
-                        'Belum lunas',
-                        style: TextStyle(
-                          color: primaryColor,
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600,
-                        ),
+                    const SizedBox(height: 4),
+                    Text(
+                      formattedDate,
+                      style: const TextStyle(
+                        color: Colors.white54,
+                        fontSize: 12,
                       ),
                     ),
                   ],
                 ),
-              ),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    'Rp ${_formatCurrency(grandTotal.toInt())}',
-                    style: const TextStyle(
-                      color: primaryColor,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 16,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    formattedDate,
-                    style: const TextStyle(color: Colors.white54, fontSize: 12),
-                  ),
-                ],
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
@@ -304,11 +320,8 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    const Color darkBlue = Color(0xFF0D172A);
-    const Color primaryColor = Color(0xFF3B5BFF);
-
     return Scaffold(
-      backgroundColor: darkBlue,
+      backgroundColor: AppTheme.background,
       // Hapus AppBar karena kita akan menggunakan custom header di Body
       body: Stack(
         children: [
@@ -339,10 +352,13 @@ class _HomeScreenState extends State<HomeScreen> {
                     Row(
                       children: [
                         IconButton(
-                          icon: const Icon(
-                            Icons.people_outline,
-                            color: Colors.white,
-                            size: 28,
+                          icon: const CircleAvatar(
+                            backgroundColor: AppTheme.surface,
+                            child: Icon(
+                              Icons.people_outline,
+                              color: Colors.white,
+                              size: 20,
+                            ),
                           ),
                           onPressed: () {
                             Navigator.push(
@@ -354,10 +370,13 @@ class _HomeScreenState extends State<HomeScreen> {
                           },
                         ),
                         IconButton(
-                          icon: const Icon(
-                            Icons.group_add_rounded,
-                            color: Colors.white,
-                            size: 28,
+                          icon: const CircleAvatar(
+                            backgroundColor: AppTheme.surface,
+                            child: Icon(
+                              Icons.group_add_rounded,
+                              color: Colors.white,
+                              size: 20,
+                            ),
                           ),
                           onPressed: () {
                             Navigator.push(
@@ -373,17 +392,6 @@ class _HomeScreenState extends State<HomeScreen> {
                   ],
                 ),
                 const SizedBox(height: 20),
-
-                // Judul Daftar Aktivitas
-                const Text(
-                  'Daftar Aktivitas Sebelumnya',
-                  style: TextStyle(
-                    color: Colors.white70,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                const SizedBox(height: 15),
 
                 // Daftar Kegiatan
                 if (_isLoading)
@@ -447,15 +455,16 @@ class _HomeScreenState extends State<HomeScreen> {
                   style: TextStyle(fontSize: 14, color: Colors.white),
                 ),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: primaryColor,
+                  backgroundColor: AppTheme.primary,
                   padding: const EdgeInsets.symmetric(
-                    horizontal: 20,
-                    vertical: 15,
+                    horizontal: 24,
+                    vertical: 16,
                   ),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(30),
                   ),
                   elevation: 8,
+                  shadowColor: AppTheme.primary.withOpacity(0.5),
                 ),
               ),
             ),

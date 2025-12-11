@@ -141,6 +141,45 @@ class UserService {
     return requests;
   }
 
+  // 📤 Get Outgoing Friend Requests (yang dikirim user & status pending)
+  Future<List<Map<String, dynamic>>> getOutgoingFriendRequests() async {
+    final currentUser = _auth.currentUser;
+
+    if (currentUser == null) {
+      throw FirebaseException(
+        plugin: 'UserService',
+        code: 'NOT_AUTHENTICATED',
+        message: 'User harus login.',
+      );
+    }
+
+    final snapshot = await _firestore
+        .collection('friendRequests')
+        .where('fromUid', isEqualTo: currentUser.uid)
+        .where('status', isEqualTo: 'pending')
+        .orderBy('createdAt', descending: true)
+        .get();
+
+    List<Map<String, dynamic>> requests = [];
+    for (var doc in snapshot.docs) {
+      final data = doc.data();
+      data['requestId'] = doc.id;
+
+      // Ambil data receiver (toUid)
+      final receiverDoc = await _firestore
+          .collection('users')
+          .doc(data['toUid'])
+          .get();
+      if (receiverDoc.exists) {
+        data['receiverData'] = receiverDoc.data();
+      }
+
+      requests.add(data);
+    }
+
+    return requests;
+  }
+
   // ✅ Accept Friend Request
   Future<void> acceptFriendRequest(String requestId, String fromUid) async {
     final currentUser = _auth.currentUser;

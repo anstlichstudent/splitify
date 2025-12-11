@@ -91,91 +91,171 @@ class _CreateActivityState extends State<CreateActivity> {
   }
 
   void _showAddMemberDialog() {
-    if (_friendsList.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Anda belum memiliki teman. Tambahkan teman terlebih dahulu.',
-          ),
-        ),
-      );
-      return;
-    }
+    final TextEditingController manualFriendController =
+        TextEditingController();
 
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: darkBlue,
-        title: const Text('Pilih Teman', style: TextStyle(color: Colors.white)),
-        content: SizedBox(
-          width: double.maxFinite,
-          child: ListView.builder(
-            shrinkWrap: true,
-            itemCount: _friendsList.length,
-            itemBuilder: (context, index) {
-              final friend = _friendsList[index];
-              final isSelected = _selectedMembers.any(
-                (member) => member['uid'] == friend['uid'],
-              );
-
-              return ListTile(
-                leading: CircleAvatar(
-                  backgroundImage: friend['photoUrl'] != null
-                      ? NetworkImage(friend['photoUrl'])
-                      : null,
-                  backgroundColor: primaryColor,
-                  child: friend['photoUrl'] == null
-                      ? Text(
-                          friend['name'][0].toUpperCase(),
+      builder: (context) => StatefulBuilder(
+        builder: (context, setStateDialog) {
+          return AlertDialog(
+            backgroundColor: darkBlue,
+            title: const Text(
+              'Pilih Teman',
+              style: TextStyle(color: Colors.white),
+            ),
+            content: SizedBox(
+              width: double.maxFinite,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Input Manual Friend
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: manualFriendController,
                           style: const TextStyle(color: Colors.white),
-                        )
-                      : null,
-                ),
-                title: Text(
-                  friend['name'] ?? 'Unknown',
-                  style: const TextStyle(color: Colors.white),
-                ),
-                subtitle: Text(
-                  friend['email'] ?? '',
-                  style: const TextStyle(color: Colors.white70),
-                ),
-                trailing: isSelected
-                    ? const Icon(Icons.check_circle, color: primaryColor)
-                    : const Icon(
-                        Icons.add_circle_outline,
-                        color: Colors.white54,
+                          decoration: const InputDecoration(
+                            hintText: 'Tambah teman tanpa akun...',
+                            hintStyle: TextStyle(color: Colors.white54),
+                            enabledBorder: UnderlineInputBorder(
+                              borderSide: BorderSide(color: Colors.white24),
+                            ),
+                            focusedBorder: UnderlineInputBorder(
+                              borderSide: BorderSide(color: primaryColor),
+                            ),
+                          ),
+                        ),
                       ),
-                onTap: () {
-                  if (isSelected) {
-                    setState(() {
-                      _selectedMembers.removeWhere(
-                        (member) => member['uid'] == friend['uid'],
-                      );
-                    });
-                  } else {
-                    setState(() {
-                      _selectedMembers.add(friend);
-                    });
-                  }
-                  Navigator.pop(context);
-                },
-              );
-            },
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Tutup', style: TextStyle(color: primaryColor)),
-          ),
-        ],
+                      IconButton(
+                        icon: const Icon(Icons.add, color: primaryColor),
+                        onPressed: () {
+                          final name = manualFriendController.text.trim();
+                          if (name.isNotEmpty) {
+                            // Add manual friend
+                            final manualMember = {
+                              'uid': null,
+                              'name': name,
+                              'email': 'Manual Entry',
+                              'photoUrl': null,
+                              'isManual': true,
+                            };
+
+                            setState(() {
+                              _selectedMembers.add(manualMember);
+                            });
+                            manualFriendController.clear();
+                            Navigator.pop(
+                              context,
+                            ); // Close dialog for simplicity or show toast
+                          }
+                        },
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 15),
+                  const Divider(color: Colors.white24),
+                  const SizedBox(height: 10),
+
+                  if (_friendsList.isEmpty)
+                    const Padding(
+                      padding: EdgeInsets.all(8.0),
+                      child: Text(
+                        "Belum ada teman tersimpan.",
+                        style: TextStyle(color: Colors.white54),
+                      ),
+                    )
+                  else
+                    Expanded(
+                      child: ListView.builder(
+                        shrinkWrap: true,
+                        itemCount: _friendsList.length,
+                        itemBuilder: (context, index) {
+                          final friend = _friendsList[index];
+                          final isSelected = _selectedMembers.any(
+                            (member) =>
+                                member['uid'] != null &&
+                                member['uid'] == friend['uid'],
+                          );
+
+                          return ListTile(
+                            leading: CircleAvatar(
+                              backgroundImage: friend['photoUrl'] != null
+                                  ? NetworkImage(friend['photoUrl'])
+                                  : null,
+                              backgroundColor: primaryColor,
+                              child: friend['photoUrl'] == null
+                                  ? Text(
+                                      friend['name'][0].toUpperCase(),
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                      ),
+                                    )
+                                  : null,
+                            ),
+                            title: Text(
+                              friend['name'] ?? 'Unknown',
+                              style: const TextStyle(color: Colors.white),
+                            ),
+                            subtitle: Text(
+                              friend['email'] ?? '',
+                              style: const TextStyle(color: Colors.white70),
+                            ),
+                            trailing: isSelected
+                                ? const Icon(
+                                    Icons.check_circle,
+                                    color: primaryColor,
+                                  )
+                                : const Icon(
+                                    Icons.add_circle_outline,
+                                    color: Colors.white54,
+                                  ),
+                            onTap: () {
+                              if (isSelected) {
+                                setState(() {
+                                  _selectedMembers.removeWhere(
+                                    (member) => member['uid'] == friend['uid'],
+                                  );
+                                });
+                              } else {
+                                setState(() {
+                                  _selectedMembers.add(friend);
+                                });
+                              }
+                              setStateDialog(() {}); // rebuild dialog
+                            },
+                          );
+                        },
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text(
+                  'Tutup',
+                  style: TextStyle(color: primaryColor),
+                ),
+              ),
+            ],
+          );
+        },
       ),
     );
   }
 
   void _removeMember(Map<String, dynamic> member) {
     setState(() {
-      _selectedMembers.removeWhere((m) => m['uid'] == member['uid']);
+      if (member['isManual'] == true) {
+        _selectedMembers.removeWhere(
+          (m) => m['name'] == member['name'] && m['isManual'] == true,
+        );
+      } else {
+        _selectedMembers.removeWhere((m) => m['uid'] == member['uid']);
+      }
     });
   }
 
@@ -190,7 +270,9 @@ class _CreateActivityState extends State<CreateActivity> {
     if (_selectedMembers.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Tambah minimal 1 member dari daftar teman'),
+          content: Text(
+            'Tambah minimal 1 member dari daftar teman atau manual',
+          ),
         ),
       );
       return;
@@ -203,6 +285,7 @@ class _CreateActivityState extends State<CreateActivity> {
     );
 
     List<String> memberUids = _selectedMembers
+        .where((m) => m['uid'] != null) // Filter out manual members
         .map((m) => m['uid'] as String)
         .toList();
 

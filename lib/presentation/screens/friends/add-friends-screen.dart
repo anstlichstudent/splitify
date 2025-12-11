@@ -52,33 +52,61 @@ class _AddFriendScreenState extends State<AddFriendScreen> {
           return;
         }
 
-        // Kirim friend request (menggantikan addFriend langsung)
+        // Simpan sementara user yang ditemukan
+        setState(() {
+          _foundUser = user;
+        });
+
+        // Kirim friend request
         await _userService.sendFriendRequest(user['uid']);
 
         setState(() {
-          _foundUser = user;
-          _message =
-              'Friend request berhasil dikirim ke ${user['name']} (${user['email']})! Tunggu hingga mereka menerima.';
+          _message = 'Request Sent';
         });
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                'Friend request sent to ${user['name']}!',
+                style: const TextStyle(color: Colors.white),
+              ),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
         _emailController.clear();
       } else {
-        _message =
-            'Pengguna dengan email "$email" tidak ditemukan di Splitify.';
+        _message = 'User not found.';
       }
     } catch (e) {
       if (e is FirebaseException) {
         switch (e.code) {
           case 'ALREADY_FRIENDS':
-            _message = 'Anda sudah berteman dengan user ini.';
+            _message = 'Already Friends';
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Anda sudah berteman dengan user ini.'),
+                ),
+              );
+            }
             break;
           case 'REQUEST_EXISTS':
-            _message = 'Anda sudah mengirim friend request ke user ini.';
+            _message = 'Request Pending';
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Friend request sudah terkirim sebelumnya.'),
+                ),
+              );
+            }
             break;
           default:
             _message = 'Error: ${e.message}';
         }
       } else {
-        _message = 'Error saat mencari atau menambahkan: ${e.toString()}';
+        _message = 'Error: ${e.toString()}';
       }
     } finally {
       setState(() {
@@ -94,6 +122,19 @@ class _AddFriendScreenState extends State<AddFriendScreen> {
     }
 
     const Color inputFieldColor = Color(0xFF1B2A41);
+    IconData trailIcon;
+    Color trailColor;
+
+    if (_message == 'Request Sent' || _message == 'Request Pending') {
+      trailIcon = Icons.mark_email_read;
+      trailColor = Colors.orange;
+    } else if (_message == 'Already Friends') {
+      trailIcon = Icons.check_circle;
+      trailColor = Colors.green;
+    } else {
+      trailIcon = Icons.send;
+      trailColor = Colors.blue;
+    }
 
     return Card(
       color: inputFieldColor,
@@ -101,9 +142,14 @@ class _AddFriendScreenState extends State<AddFriendScreen> {
       margin: const EdgeInsets.symmetric(vertical: 10),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: ListTile(
-        leading: const CircleAvatar(
-          backgroundColor: Color(0xFF3B5BFF),
-          child: Icon(Icons.person, color: Colors.white),
+        leading: CircleAvatar(
+          backgroundColor: const Color(0xFF3B5BFF),
+          backgroundImage: _foundUser!['photoUrl'] != null
+              ? NetworkImage(_foundUser!['photoUrl'])
+              : null,
+          child: _foundUser!['photoUrl'] == null
+              ? const Icon(Icons.person, color: Colors.white)
+              : null,
         ),
         title: Text(
           _foundUser!['name'] ?? 'Nama Pengguna',
@@ -116,7 +162,22 @@ class _AddFriendScreenState extends State<AddFriendScreen> {
           _foundUser!['email'] ?? 'Email Tidak Ditemukan',
           style: const TextStyle(color: Colors.white70),
         ),
-        trailing: const Icon(Icons.send, color: Colors.green),
+        trailing: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(trailIcon, color: trailColor),
+            if (_message == 'Request Sent' || _message == 'Request Pending')
+              const Text(
+                'Pending',
+                style: TextStyle(color: Colors.orange, fontSize: 10),
+              )
+            else if (_message == 'Already Friends')
+              const Text(
+                'Friend',
+                style: TextStyle(color: Colors.green, fontSize: 10),
+              ),
+          ],
+        ),
       ),
     );
   }

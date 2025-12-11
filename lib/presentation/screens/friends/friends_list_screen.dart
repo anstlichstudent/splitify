@@ -11,6 +11,7 @@ class FriendsListScreen extends StatefulWidget {
 class _FriendsListScreenState extends State<FriendsListScreen> {
   final UserService _userService = UserService();
   bool _isLoading = true;
+  List<Map<String, dynamic>> _pendingRequests = [];
   List<Map<String, dynamic>> _friends = [];
 
   // Color scheme
@@ -22,16 +23,31 @@ class _FriendsListScreenState extends State<FriendsListScreen> {
   @override
   void initState() {
     super.initState();
-    _loadFriends();
+    _loadData();
   }
 
-  Future<void> _loadFriends() async {
+  Future<void> _loadData() async {
     setState(() => _isLoading = true);
 
     try {
       final friends = await _userService.getFriendsData();
+      final pendingRaw = await _userService.getOutgoingFriendRequests();
+
+      // Map pending requests to match friend structure somewhat, using receiverData
+      final pending = pendingRaw.map((r) {
+        final receiver = r['receiverData'] ?? {};
+        return {
+          'uid': r['toUid'],
+          'name': receiver['name'] ?? 'Unknown',
+          'email': receiver['email'] ?? '',
+          'photoUrl': receiver['photoUrl'],
+          'isPending': true,
+        };
+      }).toList();
+
       setState(() {
         _friends = friends;
+        _pendingRequests = pending;
         _isLoading = false;
       });
     } catch (e) {
@@ -39,10 +55,13 @@ class _FriendsListScreenState extends State<FriendsListScreen> {
       if (mounted) {
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(SnackBar(content: Text('Error loading friends: $e')));
+        ).showSnackBar(SnackBar(content: Text('Error loading data: $e')));
       }
     }
   }
+
+  // Alias for refresh
+  Future<void> _loadFriends() => _loadData();
 
   @override
   Widget build(BuildContext context) {
@@ -64,24 +83,63 @@ class _FriendsListScreenState extends State<FriendsListScreen> {
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh, color: Colors.white),
-            onPressed: _loadFriends,
+            onPressed: _loadData,
           ),
         ],
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator(color: primaryColor))
-          : _friends.isEmpty
+          : _friends.isEmpty && _pendingRequests.isEmpty
           ? _buildEmptyState()
           : RefreshIndicator(
-              onRefresh: _loadFriends,
+              onRefresh: _loadData,
               color: primaryColor,
               backgroundColor: cardColor,
-              child: ListView.builder(
+              child: ListView(
                 padding: const EdgeInsets.all(16),
-                itemCount: _friends.length,
-                itemBuilder: (context, index) {
-                  return _buildFriendCard(_friends[index]);
-                },
+                children: [
+                  if (_pendingRequests.isNotEmpty) ...[
+                    const Padding(
+                      padding: EdgeInsets.only(bottom: 12),
+                      child: Text(
+                        'Menunggu Konfirmasi',
+                        style: TextStyle(
+                          color: Colors.white70,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                    ..._pendingRequests.map(
+                      (req) => _buildFriendCard(req, isPending: true),
+                    ),
+                    const SizedBox(height: 20),
+                    Divider(color: dividerColor),
+                    const SizedBox(height: 10),
+                  ],
+                  if (_friends.isNotEmpty) ...[
+                    const Padding(
+                      padding: EdgeInsets.only(bottom: 12),
+                      child: Text(
+                        'Teman Saya',
+                        style: TextStyle(
+                          color: Colors.white70,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                    ..._friends.map((friend) => _buildFriendCard(friend)),
+                  ] else if (_pendingRequests.isNotEmpty) ...[
+                    const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 20),
+                      child: Center(
+                        child: Text(
+                          "Belum ada teman yang aktif.",
+                          style: TextStyle(color: Colors.white54),
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
               ),
             ),
     );
@@ -126,14 +184,22 @@ class _FriendsListScreenState extends State<FriendsListScreen> {
     );
   }
 
-  Widget _buildFriendCard(Map<String, dynamic> friend) {
+  Widget _buildFriendCard(
+    Map<String, dynamic> friend, {
+    bool isPending = false,
+  }) {
     final name = friend['name'] ?? 'Unknown User';
     final email = friend['email'] ?? '';
     final photoUrl = friend['photoUrl'];
 
     // Create initials for avatar
     final initials = name.isNotEmpty
-        ? name.trim().split(' ').map((e) => e[0]).take(2).join()
+        ? name
+              .trim()
+              .split(' ')
+              .map((e) => e.isNotEmpty ? e[0] : '')
+              .take(2)
+              .join()
         : '?';
 
     return Container(
@@ -203,11 +269,28 @@ class _FriendsListScreenState extends State<FriendsListScreen> {
               ),
             ),
             // Action Icon
-            Icon(
-              Icons.check_circle,
-              color: primaryColor.withOpacity(0.7),
-              size: 24,
-            ),
+            if (isPending)
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 6,
+                ),
+                decoration: BoxDecoration(
+                  color: Colors.orange.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.orange.withOpacity(0.5)),
+                ),
+                child: const Text(
+                  'Pending',
+                  style: TextStyle(color: Colors.orange, fontSize: 12),
+                ),
+              )
+            else
+              Icon(
+                Icons.check_circle,
+                color: primaryColor.withOpacity(0.7),
+                size: 24,
+              ),
           ],
         ),
       ),
