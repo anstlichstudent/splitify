@@ -202,6 +202,39 @@ class ActivityService {
     required double servicePercent,
     required double discountNominal,
   }) async {
+    // Hitung subtotal
+    final subtotal = items.fold<double>(0, (sum, item) => sum + item.price);
+
+    // Hitung tax, service, dan grandTotal
+    final tax = subtotal * (taxPercent / 100);
+    final service = subtotal * (servicePercent / 100);
+    final grandTotal = subtotal + tax + service - discountNominal;
+
+    // Hitung subtotal per member (hanya item mereka, tanpa tax/service/discount)
+    final memberSubtotals = <String, double>{};
+    for (final member in members) {
+      memberSubtotals[member] = 0;
+    }
+    for (final item in items) {
+      memberSubtotals[item.member] =
+          (memberSubtotals[item.member] ?? 0) + item.price;
+    }
+
+    // Hitung total per member dengan tax/service/discount di-distribute
+    final memberTotals = <String, double>{};
+    for (final member in members) {
+      final memberSubtotal = memberSubtotals[member] ?? 0;
+      final proportion = subtotal > 0 ? memberSubtotal / subtotal : 0;
+
+      // Total = subtotal + (tax * proportion) + (service * proportion) - (discount * proportion)
+      final memberTotal =
+          memberSubtotal +
+          (tax * proportion) +
+          (service * proportion) -
+          (discountNominal * proportion);
+      memberTotals[member] = memberTotal;
+    }
+
     await _firestore.collection('activities').doc(activityId).update({
       'activityName': activityName,
       'activityDate': Timestamp.fromDate(activityDate),
@@ -218,6 +251,9 @@ class ActivityService {
       'taxPercent': taxPercent,
       'servicePercent': servicePercent,
       'discountNominal': discountNominal,
+      'subtotal': subtotal,
+      'grandTotal': grandTotal,
+      'memberTotals': memberTotals,
       'updatedAt': FieldValue.serverTimestamp(),
     });
   }

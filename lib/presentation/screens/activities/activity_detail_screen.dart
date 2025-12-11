@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../services/activity_service.dart';
+import 'manual_input_screen.dart';
+import '../../../data/models/bill_item.dart';
 
 class ActivityDetailScreen extends StatefulWidget {
   final String activityId;
@@ -104,17 +106,90 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
         iconTheme: const IconThemeData(color: Colors.white),
         elevation: 0,
         actions: [
-          PopupMenuButton(
+          PopupMenuButton<String>(
+            onSelected: (value) async {
+              if (value == 'edit') {
+                // Get current activity data
+                final activity = await _activityFuture;
+                if (activity == null || !mounted) return;
+
+                final members = List<String>.from(activity['members'] ?? []);
+                // Convert Map items to BillItem objects
+                List<BillItem> billItems = [];
+                if (activity['items'] != null) {
+                  for (var item in activity['items']) {
+                    if (item is Map<String, dynamic>) {
+                      billItems.add(
+                        BillItem(
+                          member: item['member'] ?? 'Unknown',
+                          name: item['name'] ?? 'Item',
+                          price: _toDouble(item['price']),
+                        ),
+                      );
+                    }
+                  }
+                }
+
+                // Retrieve values
+                final taxPercent = _toDouble(activity['taxPercent']);
+                final servicePercent = _toDouble(activity['servicePercent']);
+                final discountNominal = _toDouble(activity['discountNominal']);
+                final activityName = activity['activityName'] ?? 'Aktivitas';
+
+                // Handle Date
+                DateTime activityDate;
+                try {
+                  if (activity['activityDate'] is DateTime) {
+                    activityDate = activity['activityDate'];
+                  } else if (activity['activityDate'] != null) {
+                    // Firestore Timestamp
+                    try {
+                      activityDate = activity['activityDate'].toDate();
+                    } catch (e) {
+                      // Fallback: try to parse as string
+                      activityDate = DateTime.parse(
+                        activity['activityDate'].toString(),
+                      );
+                    }
+                  } else {
+                    activityDate = DateTime.now();
+                  }
+                } catch (e) {
+                  activityDate = DateTime.now();
+                }
+
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => ManualInputScreen(
+                      activityId: widget.activityId,
+                      activityName: activityName,
+                      activityDate: activityDate,
+                      members: members,
+                      memberUids: const [], // Not needed for update
+                      initialItems: billItems,
+                      initialTax: taxPercent,
+                      initialService: servicePercent,
+                      initialDiscount: discountNominal,
+                    ),
+                  ),
+                ).then((_) {
+                  // Refresh data after return
+                  setState(() {
+                    _activityFuture = _activityService.getActivityById(
+                      widget.activityId,
+                    );
+                  });
+                });
+              } else if (value == 'delete') {
+                _showDeleteConfirmation(context);
+              }
+            },
             itemBuilder: (context) => [
-              PopupMenuItem(
-                child: const Text('Edit'),
-                onTap: () {
-                  // TODO: Navigate to edit screen
-                },
-              ),
-              PopupMenuItem(
-                child: const Text('Hapus', style: TextStyle(color: Colors.red)),
-                onTap: () => _showDeleteConfirmation(context),
+              const PopupMenuItem(value: 'edit', child: Text('Edit')),
+              const PopupMenuItem(
+                value: 'delete',
+                child: Text('Hapus', style: TextStyle(color: Colors.red)),
               ),
             ],
           ),

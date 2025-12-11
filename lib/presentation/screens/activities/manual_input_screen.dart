@@ -8,12 +8,24 @@ class ManualInputScreen extends StatefulWidget {
   final List<String> members;
   final List<String> memberUids;
 
+  // Optional fields for Editing
+  final String? activityId;
+  final List<BillItem>? initialItems;
+  final double? initialTax;
+  final double? initialService;
+  final double? initialDiscount;
+
   const ManualInputScreen({
     super.key,
     required this.activityName,
     required this.activityDate,
     required this.members,
     required this.memberUids,
+    this.activityId,
+    this.initialItems,
+    this.initialTax,
+    this.initialService,
+    this.initialDiscount,
   });
 
   @override
@@ -40,6 +52,38 @@ class _ManualInputScreenState extends State<ManualInputScreen> {
   // Tax & Service type: true = persen, false = nominal
   bool _taxIsPersen = true;
   bool _serviceIsPersen = true;
+
+  @override
+  void initState() {
+    super.initState();
+    // Load initial data if editing
+    if (widget.initialItems != null) {
+      _items = List<BillItem>.from(widget.initialItems!);
+    }
+
+    // Setup initial Tax
+    if (widget.initialTax != null && widget.initialTax! > 0) {
+      // Asumsi awal, jika edit, kita set ke persen jika itu default,
+      // tapi karena kita simpan persen di DB, kita load sebagai persen.
+      // (ActivityService simpan taxPercent).
+      _taxPercent = widget.initialTax!;
+      _taxValueController.text = _taxPercent.toString();
+      _taxIsPersen = true;
+    }
+
+    // Setup initial Service
+    if (widget.initialService != null && widget.initialService! > 0) {
+      _servicePercent = widget.initialService!;
+      _serviceValueController.text = _servicePercent.toString();
+      _serviceIsPersen = true;
+    }
+
+    // Setup initial Discount
+    if (widget.initialDiscount != null && widget.initialDiscount! > 0) {
+      _discountNominal = widget.initialDiscount!;
+      _discountController.text = _discountNominal.toString();
+    }
+  }
 
   @override
   void dispose() {
@@ -102,17 +146,32 @@ class _ManualInputScreenState extends State<ManualInputScreen> {
         finalServicePercent = ((_serviceNominal / subtotal) * 100);
       }
 
-      await _activityService.createActivity(
-        activityName: widget.activityName,
-        activityDate: widget.activityDate,
-        members: widget.members,
-        memberUids: widget.memberUids,
-        items: _items,
-        taxPercent: finalTaxPercent,
-        servicePercent: finalServicePercent,
-        discountNominal: finalDiscount,
-        inputMethod: 'manual',
-      );
+      if (widget.activityId != null) {
+        // UPDATE Existing Activity
+        await _activityService.updateActivity(
+          activityId: widget.activityId!,
+          activityName: widget.activityName,
+          activityDate: widget.activityDate,
+          members: widget.members,
+          items: _items,
+          taxPercent: finalTaxPercent,
+          servicePercent: finalServicePercent,
+          discountNominal: finalDiscount,
+        );
+      } else {
+        // CREATE New Activity
+        await _activityService.createActivity(
+          activityName: widget.activityName,
+          activityDate: widget.activityDate,
+          members: widget.members,
+          memberUids: widget.memberUids,
+          items: _items,
+          taxPercent: finalTaxPercent,
+          servicePercent: finalServicePercent,
+          discountNominal: finalDiscount,
+          inputMethod: 'manual',
+        );
+      }
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -166,9 +225,9 @@ class _ManualInputScreenState extends State<ManualInputScreen> {
     return Scaffold(
       backgroundColor: darkBlue,
       appBar: AppBar(
-        title: const Text(
-          'Input Manual',
-          style: TextStyle(color: Colors.white),
+        title: Text(
+          widget.activityId != null ? 'Edit Aktivitas' : 'Input Manual',
+          style: const TextStyle(color: Colors.white),
         ),
         backgroundColor: darkBlue,
         iconTheme: const IconThemeData(color: Colors.white),
@@ -189,9 +248,9 @@ class _ManualInputScreenState extends State<ManualInputScreen> {
                 const SizedBox(height: 20),
 
                 // Tambah Item
-                const Text(
-                  'Tambah Pesanan',
-                  style: TextStyle(
+                Text(
+                  widget.activityId != null ? 'Edit Pesanan' : 'Tambah Pesanan',
+                  style: const TextStyle(
                     color: Colors.white,
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
@@ -557,7 +616,11 @@ class _ManualInputScreenState extends State<ManualInputScreen> {
                         )
                       : const Icon(Icons.check, color: Colors.white),
                   label: Text(
-                    _isSaving ? 'Menyimpan...' : 'Simpan Aktivitas',
+                    _isSaving
+                        ? 'Menyimpan...'
+                        : (widget.activityId != null
+                              ? 'Update Aktivitas'
+                              : 'Simpan Aktivitas'),
                     style: const TextStyle(fontSize: 18, color: Colors.white),
                   ),
                   style: ElevatedButton.styleFrom(
